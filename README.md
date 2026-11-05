@@ -42,6 +42,7 @@ instantly get the project and every conversation inside it.
   the window is without leaving what you are doing.
 - 🎨 **Colours and custom order** that persist, plus drag to reorder projects.
 - ♻️ **Always fresh.** Updates live when projects or sessions change.
+- 🆕 **Create in place.** Header buttons start a New session or a New project (with an inline name field) without leaving Finder.
 
 ## 🧭 The three tabs
 

@@ -714,11 +714,13 @@ function FinderPane() {
   const qc = useQueryClient()
   const inputRef = useRef(null)
   const dragId = useRef(null)
+  const newProjRef = useRef(null)
 
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState('all')
   const [expanded, setExpanded] = useState(() => new Set())
   const [dragOverId, setDragOverId] = useState(null)
+  const [creating, setCreating] = useState(false)
   const [menu, setMenu] = useState(null)
   const [order, setOrder] = usePersisted(ORDER_KEY, [])
   const [showStats, setShowStats] = usePersisted(STATS_KEY, true)
@@ -888,6 +890,19 @@ function FinderPane() {
     [invalidate]
   )
 
+  const newProject = useCallback(() => {
+    const el = newProjRef.current
+    const name = ((el && el.value) || '').trim()
+    if (!name) {
+      setCreating(false)
+      return
+    }
+    if (el) el.value = ''
+    setCreating(false)
+    rpc('projects.create', { name, use: false }, 'Project created')
+  }, [rpc])
+  const newSession = useCallback(() => host.newChat(), [])
+
   const commitRename = useCallback(
     name => {
       const g = menu?.group
@@ -1020,6 +1035,8 @@ function FinderPane() {
         data?.mode === 'flat'
           ? h(Tip, { label: `Project grouping unavailable (${data.treeError || 'projects.tree missing'}).` }, h(Codicon, { name: 'warning', size: '0.8125rem', className: 'text-(--ui-text-quaternary)' }))
           : null,
+        headerBtn('add', 'New session', newSession),
+        headerBtn('new-folder', creating ? 'Cancel new project' : 'New project', () => setCreating(c => !c), creating),
         headerBtn('graph', showStats ? 'Hide token stats' : 'Show token stats', () => setShowStats(v => !v), showStats),
         order.length ? headerBtn('clear-all', 'Reset custom order', () => setOrder([])) : null,
         grouped && groups.length ? headerBtn(anyExpanded ? 'collapse-all' : 'expand-all', anyExpanded ? 'Collapse all' : 'Expand all', toggleAll) : null,
@@ -1041,7 +1058,28 @@ function FinderPane() {
         h(ScopeTabs, { scope, setScope }),
         h('div', { className: 'flex-1' }),
         h(Tip, { label: showStats && view.totalCost ? `Total cost ${fmtCost(view.totalCost)}` : 'Shown' }, h('span', { className: 'shrink-0 text-[0.625rem] text-(--ui-text-quaternary)' }, countLabel))
-      )
+      ),
+      creating
+        ? h(
+            'div',
+            { className: 'flex items-center gap-1' },
+            h(Codicon, { name: 'new-folder', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
+            h('input', {
+              autoFocus: true,
+              ref: newProjRef,
+              placeholder: 'New project name…',
+              onKeyDown: e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  newProject()
+                } else if (e.key === 'Escape') setCreating(false)
+              },
+              className: 'min-w-0 flex-1 rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
+            }),
+            h('button', { type: 'button', onClick: newProject, className: 'shrink-0 rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Create'),
+            h('button', { type: 'button', onClick: () => setCreating(false), className: 'shrink-0 rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel')
+          )
+        : null
     ),
     bodyNode
   )
