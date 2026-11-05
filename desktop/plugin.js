@@ -146,27 +146,31 @@ function openSession(id, intent) {
   })
 }
 
-function copyId(id) {
-  if (!id) return
-  const ok = () => host.notify({ kind: 'success', message: 'Session id copied' })
-  const fail = () => host.notify({ kind: 'error', message: 'Could not copy session id' })
+function copyText(text, okMsg) {
+  if (!text) return
+  const ok = () => host.notify({ kind: 'success', message: okMsg || 'Copied' })
+  const fail = () => host.notify({ kind: 'error', message: 'Could not copy to clipboard' })
   try {
-    Promise.resolve(writeClipboardText(id))
+    Promise.resolve(writeClipboardText(text))
       .then(res => (res === false ? fail() : ok()))
       .catch(() => {
         try {
-          navigator.clipboard.writeText(id).then(ok, fail)
+          navigator.clipboard.writeText(text).then(ok, fail)
         } catch {
           fail()
         }
       })
   } catch {
     try {
-      navigator.clipboard.writeText(id).then(ok, fail)
+      navigator.clipboard.writeText(text).then(ok, fail)
     } catch {
       fail()
     }
   }
+}
+
+function copyId(id) {
+  if (id) copyText(id, 'Session id copied')
 }
 
 // -- persisted plugin state (ctx.storage is sync) --------------------------------
@@ -602,6 +606,7 @@ function ContextMenu({ menu, ops }) {
       'div',
       { className: 'flex flex-col' },
       g.path ? item('add', 'New session here', () => ops.newSessionInProject(g)) : null,
+      g.path ? item('copy', 'Copy folder path', () => { copyText(g.path, 'Folder path copied'); ops.closeMenu() }) : null,
       g.editable ? item('edit', 'Rename…', () => ops.setMenuMode('rename')) : null,
       colorRow,
       colorRow || g.editable || g.path ? sep() : null,

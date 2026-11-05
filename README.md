@@ -55,6 +55,7 @@ instantly get the project and every conversation inside it.
 
 **On a project**
 - ➕ New session in this project
+- 📋 Copy folder path
 - ✏️ Rename
 - 🎨 Colour (presets, custom, or clear)
 - ⬆️ Move to top / ⬇️ Move to bottom (or just drag the handle)
