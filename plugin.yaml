@@ -1,0 +1,29 @@
+manifest_version: 2
+name: finder
+version: "1.0.0"
+description: >-
+  Finder adds a dock tab to the Hermes Desktop sidebar (Sessions, Bots, Finder)
+  that searches and filters projects and sessions, including by project name,
+  which the built-in search cannot do. Tabs: All (projects grouped with the
+  project-less bucket), Projects (real projects, expandable to their sessions),
+  and Sessions (a flat list of every session). Right-click a project to create a
+  session in it, rename, recolour, reorder or delete; right-click a session to
+  open it, copy its id, tag it, archive or delete. Shows per-session and
+  per-project token and cost stats plus a live context meter for the open chat.
+  Desktop only; no agent tools, hooks, middleware or environment variables.
+author: oways
+license: MIT
+homepage: https://github.com/oways/hermes-finder
+tags:
+  - desktop
+  - sessions
+  - projects
+  - search
+  - filter
+  - productivity
+requires_hermes: ">=0.22"
+capabilities:
+  provides_tools: []
+  provides_hooks: []
+  provides_middleware: []
+  requires_env: []

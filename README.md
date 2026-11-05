@@ -1,0 +1,133 @@
+<p align="center">
+  <img src="assets/icon.svg" width="112" alt="Finder icon" />
+</p>
+
+<h1 align="center">Finder for Hermes Desktop</h1>
+
+<p align="center">
+  Find any project or session in seconds, right from the sidebar.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Hermes-Desktop%20Plugin-6366f1?style=flat-square" alt="Hermes Desktop Plugin" />
+  <img src="https://img.shields.io/badge/catalog%20validate-passing-brightgreen?style=flat-square" alt="Validation passing" />
+  <img src="https://img.shields.io/badge/requires-Hermes%20%E2%89%A5%200.22-8b5cf6?style=flat-square" alt="Requires Hermes 0.22+" />
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license" />
+</p>
+
+---
+
+## 🔎 What it is
+
+Hermes' built-in sidebar search looks at a session's title, preview, folder and
+git branch, but it never looks at the **project** a session belongs to, and
+there is no way to search projects by name at all. Finder fixes that.
+
+It adds a **Finder** tab to the sidebar strip (right next to Sessions and Bots)
+with one search box that spans your whole workspace. Type a project name and you
+instantly get the project and every conversation inside it.
+
+> 🖼️ Screenshots: drop images into `assets/` and reference them here
+> (for example `![Finder](assets/preview.png)`) before you submit to the catalog.
+
+## ✨ Highlights
+
+- 🗂️ **Search projects by name** (the thing core search cannot do), plus the
+  usual session fields: title, preview, folder, git branch, repo, source, model.
+- 🧭 **Three focused views** so you always see the right shape of your work.
+- 🖱️ **Right-click menus** for the actions you actually reach for: new session,
+  rename, recolour, reorder, archive, delete, copy id.
+- 📊 **Token and cost stats** per session and per project, with a running total.
+- 🫀 **Live context meter** for the chat you have open, so you can see how full
+  the window is without leaving what you are doing.
+- 🎨 **Colours and custom order** that persist, plus drag to reorder projects.
+- ♻️ **Always fresh.** Updates live when projects or sessions change.
+
+## 🧭 The three tabs
+
+| Tab | What you get |
+| --- | --- |
+| **All** | Every project grouped (including the project-less bucket), expandable to its sessions. |
+| **Projects** | Only real projects, each one expandable to the sessions inside it. |
+| **Sessions** | A flat list of every session, with its project shown as a tag. |
+
+## 🖱️ Right-click menus
+
+**On a project**
+- ➕ New session in this project
+- ✏️ Rename
+- 🎨 Colour (presets, custom, or clear)
+- ⬆️ Move to top / ⬇️ Move to bottom (or just drag the handle)
+- 🗑️ Delete project (your sessions are kept, they only lose the grouping)
+
+**On a session**
+- 💬 Open, in a new tab, or in a new window
+- 📋 Copy session id
+- 🎨 Tag colour
+- 📦 Archive
+- 🗑️ Delete
+
+## ⬇️ Install
+
+### From the Hermes plugin catalog (once listed)
+
+```bash
+hermes plugins install finder
+```
+
+### Manually, right now
+
+Copy the plugin file into your desktop plugins folder:
+
+```bash
+mkdir -p ~/.hermes/desktop-plugins/finder
+cp desktop/plugin.js ~/.hermes/desktop-plugins/finder/plugin.js
+```
+
+Then open the Command Palette (Cmd/Ctrl + K), run **Reload desktop plugins**,
+and the **Finder** tab appears next to Sessions.
+
+## ⌨️ Opening it
+
+- Click the **Finder** tab in the sidebar.
+- Press **Cmd/Ctrl + Alt + F**.
+- Command Palette: **Find projects & sessions**.
+
+Tip: hold Cmd/Ctrl while clicking a session to open it in a new tab, or Shift to
+open it in a new window.
+
+## 🔒 Privacy and safety
+
+- Desktop only. It uses the public `@hermes/plugin-sdk` surface and nothing
+  else: no agent tools, no hooks, no middleware, no environment variables.
+- No network calls, no telemetry. Everything it shows comes from your own
+  gateway over its normal RPCs.
+- Your custom colours, project order and preferences are stored locally in the
+  plugin's own storage.
+- Destructive actions ask for confirmation. Deleting a session is refused by
+  Hermes while that chat is live, and Finder tells you instead of failing
+  quietly.
+
+## 🧩 Requirements
+
+Hermes Desktop version 0.22 or newer.
+
+## 🛠️ Project layout
+
+```
+hermes-finder/
+  plugin.yaml        catalog manifest
+  desktop/
+    plugin.js        the plugin (single ESM file, no build step)
+  assets/
+    icon.svg         icon shown on the catalog card
+  README.md
+  LICENSE
+```
+
+The plugin is a single uncompiled ES module. Edit `desktop/plugin.js`, save, and
+run **Reload desktop plugins** to see changes live.
+
+## 📄 License
+
+MIT. See [LICENSE](LICENSE).
