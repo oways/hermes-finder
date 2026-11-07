@@ -10,6 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Hermes-Desktop%20Plugin-6366f1?style=flat-square" alt="Hermes Desktop Plugin" />
+  <a href="https://hermes-agent.nousresearch.com/docs/plugins/finder"><img src="https://img.shields.io/badge/Hermes%20Marketplace-listed-22c55e?style=flat-square" alt="Listed in the Hermes Marketplace" /></a>
   <img src="https://img.shields.io/badge/catalog%20validate-passing-brightgreen?style=flat-square" alt="Validation passing" />
   <img src="https://img.shields.io/badge/requires-Hermes%20%E2%89%A5%200.22-8b5cf6?style=flat-square" alt="Requires Hermes 0.22+" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license" />
@@ -26,9 +27,6 @@ there is no way to search projects by name at all. Finder fixes that.
 It adds a **Finder** tab to the sidebar strip (right next to Sessions and Bots)
 with one search box that spans your whole workspace. Type a project name and you
 instantly get the project and every conversation inside it.
-
-> 🖼️ Screenshots: drop images into `assets/` and reference them here
-> (for example `![Finder](assets/preview.png)`) before you submit to the catalog.
 
 ## ✨ Highlights
 
@@ -71,7 +69,9 @@ instantly get the project and every conversation inside it.
 
 ## ⬇️ Install
 
-### From the Hermes plugin catalog (once listed)
+### From the Hermes plugin catalog
+
+Finder is listed in the [Hermes Marketplace](https://hermes-agent.nousresearch.com/docs/plugins/finder), so the one-liner works:
 
 ```bash
 hermes plugins install finder
