@@ -78,11 +78,12 @@ instantly get the project and every conversation inside it.
 
 **On a session**
 - 💬 Open, in a new tab, or in a new window
+- 📁 Search projects and move the session to another project
 - 📋 Copy session id
 - 📌 Pin / unpin
 - 🎨 Tag colour
 - 📦 Archive
-- 🗑️ Delete
+- 🗑️ Delete (uses Hermes' revision-fenced session API)
 
 ## ⬇️ Install
 
@@ -155,6 +156,7 @@ run **Reload desktop plugins** to see changes live.
 - 📌 **Pin** projects and sessions to the top.
 - ↕️ **Sort toggle.** Last active, name, token use, cost, or your own custom order.
 - ☑️ **Multi-select** sessions for bulk archive, delete, colour, or move to a project.
+- 🔧 **Compatible session deletion.** Single and bulk deletion use Hermes' revision-fenced Desktop API, including backends that do not expose the legacy `session.delete` RPC.
 - 🐛 Fixed blur having no visual effect (the plugin now ships its own blur style instead of relying on a Tailwind class the app does not compile).
 
 ### v1.0.0
