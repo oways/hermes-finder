@@ -11,6 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Hermes-Desktop%20Plugin-6366f1?style=flat-square" alt="Hermes Desktop Plugin" />
   <a href="https://hermes-agent.nousresearch.com/docs/plugins/finder"><img src="https://img.shields.io/badge/Hermes%20Marketplace-listed-22c55e?style=flat-square" alt="Listed in the Hermes Marketplace" /></a>
+  <img src="https://img.shields.io/badge/version-v1.1.0-6366f1?style=flat-square" alt="Version 1.1.0" />
   <img src="https://img.shields.io/badge/catalog%20validate-passing-brightgreen?style=flat-square" alt="Validation passing" />
   <img src="https://img.shields.io/badge/requires-Hermes%20%E2%89%A5%200.22-8b5cf6?style=flat-square" alt="Requires Hermes 0.22+" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license" />
@@ -145,6 +146,23 @@ hermes-finder/
 
 The plugin is a single uncompiled ES module. Edit `desktop/plugin.js`, save, and
 run **Reload desktop plugins** to see changes live.
+
+## 🗓️ Changelog
+
+### v1.1.0
+- 📁 **Groups.** Organise projects into collapsible groups (default **General projects**); add, rename, recolour and delete groups, and move projects between them.
+- 🫥 **Privacy / blur.** Blur titles **per project, per group, or all at once** (hover to reveal). Blur-all from the header eye or Cmd/Ctrl+Alt+P.
+- 📌 **Pin** projects and sessions to the top.
+- ↕️ **Sort toggle.** Last active, name, token use, cost, or your own custom order.
+- ☑️ **Multi-select** sessions for bulk archive, delete, colour, or move to a project.
+- 🐛 Fixed blur having no visual effect (the plugin now ships its own blur style instead of relying on a Tailwind class the app does not compile).
+
+### v1.0.0
+- 🔎 Search that includes **project names** (which core search cannot), plus session title, preview, folder, git branch, source and model.
+- 🧭 Three tabs: All / Projects / Sessions.
+- 🖱️ Right-click actions: new session, copy folder path, rename, colour, reorder and delete (projects); open / new tab / new window, copy id, tag colour, archive and delete (sessions).
+- 🆕 New session and New project from the header.
+- 📊 Token and cost stats, plus a live context meter for the open chat.
 
 ## 📄 License
 

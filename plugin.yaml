@@ -1,6 +1,6 @@
 manifest_version: 2
 name: finder
-version: "1.0.0"
+version: "1.1.0"
 description: >-
   Finder adds a dock tab to the Hermes Desktop sidebar (Sessions, Bots, Finder)
   that searches and filters projects and sessions, including by project name,
