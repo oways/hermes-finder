@@ -880,7 +880,7 @@ function ContextMenu({ menu, ops }) {
     content = h(
       'div',
       { className: 'flex flex-col' },
-      g.path ? item('add', 'New session here', () => ops.newSessionInProject(g)) : null,
+      item('add', 'Create session here', () => ops.newSessionInProject(g)),
       g.path ? item('copy', 'Copy folder path', () => { copyText(g.path, 'Folder path copied'); ops.closeMenu() }) : null,
       item(pinned ? 'pinned' : 'pin', pinned ? 'Unpin project' : 'Pin project', () => ops.togglePinProject(g.id)),
       item(ops.blurProjects && ops.blurProjects[g.id] ? 'eye-closed' : 'eye', ops.blurProjects && ops.blurProjects[g.id] ? 'Unblur name' : 'Blur name', () => ops.toggleBlurProject(g.id)),
@@ -1283,17 +1283,22 @@ function FinderPane() {
   const newSessionInProject = useCallback(
     proj => {
       setMenu(null)
-      if (!proj.path) {
-        host.notify({ kind: 'error', message: 'This group has no folder to open a session in.' })
+      const cwd = String(proj.path || host.state.cwd.get() || '').trim()
+      if (!cwd) {
+        host.notify({ kind: 'error', message: 'Open a workspace folder first, then create a session here.' })
         return
       }
-      Promise.resolve(host.request('session.create', { cwd: proj.path, cwd_explicit: true }))
+      const attach = proj.path
+        ? Promise.resolve()
+        : Promise.resolve(host.request('projects.add_folder', { id: proj.id, path: cwd, is_primary: true }))
+      attach
+        .then(() => host.request('session.create', { cwd, cwd_explicit: true }))
         .then(res => {
           const id = res?.stored_session_id || res?.session_id
           if (id) openSession(id, 'stack')
           invalidate()
         })
-        .catch(err => host.notify({ kind: 'error', message: `Could not create session: ${err?.message || err}` }))
+        .catch(err => host.notify({ kind: 'error', message: `Could not create session here: ${err?.message || err}` }))
     },
     [invalidate]
   )
