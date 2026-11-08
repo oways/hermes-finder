@@ -76,7 +76,21 @@ const COLOR_PRESETS = [
   '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#64748b'
 ]
 
-const BLUR = 'blur-sm hover:blur-none transition-[filter] duration-150'
+const BLUR = 'finder-blur'
+const BLUR_STYLE_ID = 'finder-blur-style'
+
+// The app ships only the Tailwind classes its OWN source uses, so a runtime
+// plugin's `blur-sm`/`hover:blur-none` never land in the compiled CSS. Inject
+// our own class (filter + hover-reveal) once so privacy blur actually renders.
+function ensureBlurStyle() {
+  try {
+    if (typeof document === 'undefined' || document.getElementById(BLUR_STYLE_ID)) return
+    const el = document.createElement('style')
+    el.id = BLUR_STYLE_ID
+    el.textContent = '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}'
+    document.head.appendChild(el)
+  } catch {}
+}
 
 let storage = null
 
@@ -1625,6 +1639,7 @@ export default {
   name: 'Finder - Projects & Sessions',
   register(ctx) {
     storage = ctx.storage
+    ensureBlurStyle()
 
     ctx.register({
       id: 'pane',
