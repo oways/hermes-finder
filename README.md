@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="assets/icon.svg" width="112" alt="Finder icon" />
-</p>
+![Finder - search and organise your Hermes projects and sessions](assets/banner.png)
 
 <h1 align="center">Finder for Hermes Desktop</h1>
 
