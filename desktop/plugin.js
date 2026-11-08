@@ -792,11 +792,13 @@ function ContextMenu({ menu, ops }) {
     )
   } else if (menu.mode === 'newproject') {
     let el = null
+    const cwd = String(host.state.cwd.get() || '').trim()
     const commit = () => ops.commitNewProject(el ? el.value : '')
     content = h(
       'div',
       { className: 'flex flex-col gap-2 p-1' },
       heading('New project in this group'),
+      h('div', { className: 'max-w-[220px] text-[0.6875rem] text-(--ui-text-quaternary)' }, cwd ? `Folder: ${cwd}` : 'Open a workspace folder first. Hermes projects need a folder.'),
       h('input', {
         autoFocus: true,
         placeholder: 'Project name',
@@ -1415,13 +1417,18 @@ function FinderPane() {
   const createProjectInGroup = useCallback(
     (name, groupId) => {
       const n = (name || '').trim()
+      const cwd = String(host.state.cwd.get() || '').trim()
       setMenu(null)
       if (!n) return
-      Promise.resolve(host.request('projects.create', { name: n }))
+      if (!cwd) {
+        host.notify({ kind: 'error', message: 'Open a workspace folder first, then create the project here.' })
+        return
+      }
+      Promise.resolve(host.request('projects.create', { name: n, folders: [cwd], primary_path: cwd, use: false }))
         .then(res => {
           const pid = res && res.project && res.project.id
           if (pid && groupId && groupId !== DEFAULT_GROUP_ID) setGroupOf(prev => ({ ...prev, [pid]: groupId }))
-          host.notify({ kind: 'success', message: 'Project created' })
+          host.notify({ kind: 'success', message: 'Project created in the current workspace' })
           invalidate()
         })
         .catch(err => host.notify({ kind: 'error', message: `projects.create failed: ${(err && err.message) || err}` }))

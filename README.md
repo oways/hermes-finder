@@ -39,7 +39,7 @@ instantly get the project and every conversation inside it.
   the window is without leaving what you are doing.
 - 🎨 **Colours and custom order** that persist, plus drag to reorder projects.
 - ♻️ **Always fresh.** Updates live when projects or sessions change.
-- 🆕 **Create in place.** Header buttons start a New session or a New project (with an inline name field) without leaving Finder.
+- 🆕 **Create in place.** Header buttons start a New session or a New project (with an inline name field) without leaving Finder. Group-created projects follow Hermes' folder-backed project flow and use the current workspace folder.
 - 📁 **Groups.** Every project lives in a group (default **General projects**); make your own groups and move projects between them.
 - 🫥 **Privacy / blur.** Hide sensitive names when screen-sharing by blurring titles **per project, per group, or all at once** (hover to reveal). Blur-all toggles from the header (eye) or Cmd/Ctrl+Alt+P; per-project and per-group blur live in the right-click menus.
 - 📌 **Pin** the projects and sessions you use most to the top.
@@ -149,7 +149,7 @@ run **Reload desktop plugins** to see changes live.
 ## 🗓️ Changelog
 
 ### v1.1.0
-- 📁 **Groups.** Organise projects into collapsible groups (default **General projects**); add, rename, recolour and delete groups, and move projects between them. Create a project straight into a group from its right-click menu, then create a session from the project menu.
+- 📁 **Groups.** Organise projects into collapsible groups (default **General projects**); add, rename, recolour and delete groups, and move projects between them. Create a folder-backed project straight into a group from its right-click menu, then create a session from the project menu.
 - 🫥 **Privacy / blur.** Blur titles **per project, per group, or all at once** (hover to reveal). Blur-all from the header eye or Cmd/Ctrl+Alt+P.
 - 📌 **Pin** projects and sessions to the top.
 - ↕️ **Sort toggle.** Last active, name, token use, cost, or your own custom order.
