@@ -53,6 +53,8 @@ const PINP_KEY = 'pinnedProjects'
 const PINS_KEY = 'pinnedSessions'
 const SORT_KEY = 'sortKey'
 const PRIVACY_KEY = 'privacy'
+const BLURP_KEY = 'blurProjects'
+const BLURG_KEY = 'blurGroups'
 const GROUPS_KEY = 'groups'
 const GROUPOF_KEY = 'groupOf'
 const COLLAPSED_KEY = 'collapsedGroups'
@@ -380,8 +382,8 @@ function ActiveContextChip() {
 }
 
 // -- session row -----------------------------------------------------------------
-function renderSession(s, ops) {
-  const { needle, showStats, focusedId, flat, sessionColors, privacy, selectMode, selected } = ops
+function renderSession(s, ops, blur) {
+  const { needle, showStats, focusedId, flat, sessionColors, selectMode, selected } = ops
   const active = s.id === focusedId
   const isSel = selectMode && selected && selected.has(s.id)
   const pinnedHere = (ops.pinnedSessions && ops.pinnedSessions[s.id]) || s.pinned
@@ -452,14 +454,14 @@ function renderSession(s, ops) {
             className: cn(
               'truncate text-[0.8125rem] leading-tight',
               s.title ? 'text-(--ui-text-secondary)' : 'text-(--ui-text-quaternary) italic',
-              privacy && BLUR
+              blur && BLUR
             )
           },
           highlight(title, needle)
         )
       ),
       s.preview
-        ? h('span', { className: cn('truncate text-[0.6875rem] leading-tight text-(--ui-text-quaternary)', privacy && BLUR) }, highlight(s.preview, needle))
+        ? h('span', { className: cn('truncate text-[0.6875rem] leading-tight text-(--ui-text-quaternary)', blur && BLUR) }, highlight(s.preview, needle))
         : null,
       metaBits.length
         ? h('span', { className: 'mt-0.5 truncate text-[0.625rem] leading-tight text-(--ui-text-quaternary)' }, metaBits.join('  ·  '))
@@ -470,8 +472,9 @@ function renderSession(s, ops) {
 
 // -- project node ----------------------------------------------------------------
 function renderGroup(group, ops) {
-  const { needle, showStats, dragOverId, canOrder, privacy } = ops
+  const { needle, showStats, dragOverId, canOrder } = ops
   const expanded = ops.isExpanded(group.id)
+  const blur = ops.isBlurred ? ops.isBlurred(group.id) : false
   const pinnedHere = ops.pinnedProjects && ops.pinnedProjects[group.id]
   const dotStyle = group.color ? { backgroundColor: group.color } : undefined
   const chevron = expanded ? 'chevron-down' : 'chevron-right'
@@ -547,7 +550,7 @@ function renderGroup(group, ops) {
         ? h('span', { className: 'size-2.5 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: iconName, size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
       pinnedHere ? h(Codicon, { name: 'pinned', size: '0.75rem', className: 'shrink-0 text-(--ui-text-quaternary)' }) : null,
-      h('span', { className: cn('min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground', privacy && BLUR) }, highlight(group.name, needle)),
+      h('span', { className: cn('min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground', blur && BLUR) }, highlight(group.name, needle)),
       h(Badge, { className: 'shrink-0' }, String(group.sessionCount))
     ),
     group.isNoProject
@@ -578,7 +581,7 @@ function renderGroup(group, ops) {
 
   const body =
     expanded && group.sessions.length
-      ? h('div', { className: 'flex flex-col pb-1' }, ...group.sessions.map(s => renderSession(s, ops)))
+      ? h('div', { className: 'flex flex-col pb-1' }, ...group.sessions.map(s => renderSession(s, ops, blur)))
       : expanded && !group.sessions.length
         ? h('div', { className: 'py-1 pl-8 text-[0.6875rem] text-(--ui-text-quaternary)' }, needle ? 'No matching sessions.' : 'No sessions yet.')
         : null
@@ -591,6 +594,7 @@ function renderCollection(coll, ops) {
   const expanded = ops.isCollExpanded(coll.id)
   const chevron = expanded ? 'chevron-down' : 'chevron-right'
   const dotStyle = coll.color ? { backgroundColor: coll.color } : undefined
+  const collBlur = ops.isCollBlurred ? ops.isCollBlurred(coll.id) : false
 
   const header = h(
     'div',
@@ -613,7 +617,7 @@ function renderCollection(coll, ops) {
       coll.color
         ? h('span', { className: 'size-2 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: 'layers', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
-      h('span', { className: 'min-w-0 flex-1 truncate text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)' }, highlight(coll.name, ops.needle)),
+      h('span', { className: cn('min-w-0 flex-1 truncate text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)', collBlur && BLUR) }, highlight(coll.name, ops.needle)),
       h('span', { className: 'shrink-0 text-[0.625rem] text-(--ui-text-quaternary)' }, `${coll.projects.length}p · ${coll.sessionCount}s`)
     ),
     h(
@@ -808,6 +812,7 @@ function ContextMenu({ menu, ops }) {
       { className: 'flex flex-col' },
       item('add', 'New group…', () => ops.setMenuMode('newgroup')),
       item('edit', 'Rename group…', () => ops.setMenuMode('rename')),
+      item(ops.blurGroups && ops.blurGroups[c.id] ? 'eye-closed' : 'eye', ops.blurGroups && ops.blurGroups[c.id] ? 'Unblur group' : 'Blur group', () => ops.toggleBlurGroup(c.id)),
       h('div', { className: 'px-1 pt-1' }, heading('Group colour'), colorSwatches(c.color, col => ops.setCollectionColor(c.id, col), () => ops.setCollectionColor(c.id, ''))),
       c.id === DEFAULT_GROUP_ID ? null : sep(),
       c.id === DEFAULT_GROUP_ID ? null : item('trash', 'Delete group', () => ops.setMenuMode('confirm'), true)
@@ -824,6 +829,7 @@ function ContextMenu({ menu, ops }) {
       g.path ? item('add', 'New session here', () => ops.newSessionInProject(g)) : null,
       g.path ? item('copy', 'Copy folder path', () => { copyText(g.path, 'Folder path copied'); ops.closeMenu() }) : null,
       item(pinned ? 'pinned' : 'pin', pinned ? 'Unpin project' : 'Pin project', () => ops.togglePinProject(g.id)),
+      item(ops.blurProjects && ops.blurProjects[g.id] ? 'eye-closed' : 'eye', ops.blurProjects && ops.blurProjects[g.id] ? 'Unblur name' : 'Blur name', () => ops.toggleBlurProject(g.id)),
       item('layers', 'Move to group…', () => ops.setMenuMode('movegroup')),
       g.editable ? item('edit', 'Rename…', () => ops.setMenuMode('rename')) : null,
       colorRow,
@@ -1033,6 +1039,8 @@ function FinderPane() {
   const [pinnedSessions, setPinnedSessions] = usePersisted(PINS_KEY, {})
   const [sortKey, setSortKey] = usePersisted(SORT_KEY, 'manual')
   const [privacy, setPrivacy] = usePersisted(PRIVACY_KEY, false)
+  const [blurProjects, setBlurProjects] = usePersisted(BLURP_KEY, {})
+  const [blurGroups, setBlurGroups] = usePersisted(BLURG_KEY, {})
   const [groupsRaw, setGroupsRaw] = usePersisted(GROUPS_KEY, [])
   const [groupOf, setGroupOf] = usePersisted(GROUPOF_KEY, {})
   const [collapsed, setCollapsed] = usePersisted(COLLAPSED_KEY, {})
@@ -1061,7 +1069,7 @@ function FinderPane() {
         for (const s of p.sessions) {
           if (seen.has(s.id)) continue
           seen.add(s.id)
-          flat.push({ ...s, ownerName: p.isNoProject ? '' : p.name })
+          flat.push({ ...s, ownerName: p.isNoProject ? '' : p.name, ownerId: p.id })
         }
       }
       const filtered = flat.filter(s => !needle || sessionText(s).includes(needle))
@@ -1263,6 +1271,31 @@ function FinderPane() {
     })
   }, [setPinnedSessions])
 
+  // blur (privacy) - per project, per group, or all (header toggle)
+  const toggleBlurProject = useCallback(id => {
+    setMenu(null)
+    setBlurProjects(prev => {
+      const n = { ...prev }
+      if (n[id]) delete n[id]
+      else n[id] = true
+      return n
+    })
+  }, [setBlurProjects])
+  const toggleBlurGroup = useCallback(id => {
+    setMenu(null)
+    setBlurGroups(prev => {
+      const n = { ...prev }
+      if (n[id]) delete n[id]
+      else n[id] = true
+      return n
+    })
+  }, [setBlurGroups])
+  const isBlurred = useCallback(
+    id => privacy || !!blurProjects[id] || !!blurGroups[groupOf[id] || DEFAULT_GROUP_ID],
+    [privacy, blurProjects, blurGroups, groupOf]
+  )
+  const isCollBlurred = useCallback(id => privacy || !!blurGroups[id], [privacy, blurGroups])
+
   // groups
   const moveProjectToGroup = useCallback((projectId, groupId) => {
     setMenu(null)
@@ -1406,6 +1439,8 @@ function FinderPane() {
     selected,
     pinnedProjects,
     pinnedSessions,
+    isBlurred,
+    isCollBlurred,
     onToggle: toggle,
     onToggleColl: toggleColl,
     isExpanded,
@@ -1422,6 +1457,8 @@ function FinderPane() {
     sessionColors,
     pinnedProjects,
     pinnedSessions,
+    blurProjects,
+    blurGroups,
     canOrder,
     groups: groupsDef,
     groupOf,
@@ -1439,6 +1476,8 @@ function FinderPane() {
     moveBottom,
     togglePinProject,
     togglePinSession,
+    toggleBlurProject,
+    toggleBlurGroup,
     moveProjectToGroup
   }
   const sortOps = {
@@ -1468,7 +1507,7 @@ function FinderPane() {
           h(
             'div',
             { className: 'flex flex-col gap-0.5 p-1.5' },
-            ...flat.map(s => renderSession(s, ops)),
+            ...flat.map(s => renderSession(s, ops, ops.isBlurred(s.ownerId))),
             view.flatTotal > flat.length
               ? h('div', { className: 'px-2 py-2 text-center text-[0.625rem] text-(--ui-text-quaternary)' }, `Showing first ${flat.length} of ${view.flatTotal}. Narrow with search.`)
               : null
@@ -1548,7 +1587,7 @@ function FinderPane() {
         { className: 'flex items-center gap-1' },
         h(ScopeTabs, { scope, setScope }),
         h('div', { className: 'flex-1' }),
-        headerBtn(privacy ? 'eye-closed' : 'eye', privacy ? 'Privacy mode on (titles blurred)' : 'Privacy mode (blur titles)', () => setPrivacy(v => !v), privacy),
+        headerBtn(privacy ? 'eye-closed' : 'eye', privacy ? 'Blur-all on (all titles blurred)' : 'Blur all titles (privacy)', () => setPrivacy(v => !v), privacy),
         headerBtn('sort-precedence', `Sort: ${SORT_LABEL[sortKey] || 'Custom order'}`, e => setSortAt({ x: e.clientX, y: e.clientY }), sortKey !== 'manual'),
         headerBtn('checklist', selectMode ? 'Exit multi-select' : 'Multi-select sessions', toggleSelectMode, selectMode),
         headerBtn('graph', showStats ? 'Hide token stats' : 'Show token stats', () => setShowStats(v => !v), showStats),

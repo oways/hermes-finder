@@ -42,7 +42,7 @@ instantly get the project and every conversation inside it.
 - ♻️ **Always fresh.** Updates live when projects or sessions change.
 - 🆕 **Create in place.** Header buttons start a New session or a New project (with an inline name field) without leaving Finder.
 - 📁 **Groups.** Every project lives in a group (default **General projects**); make your own groups and move projects between them.
-- 🫥 **Privacy mode.** Blur every title at once for screen-sharing, streaming or screenshots (hover to reveal). Toggle with Cmd/Ctrl+Alt+P.
+- 🫥 **Privacy / blur.** Hide sensitive names when screen-sharing by blurring titles **per project, per group, or all at once** (hover to reveal). Blur-all toggles from the header (eye) or Cmd/Ctrl+Alt+P; per-project and per-group blur live in the right-click menus.
 - 📌 **Pin** the projects and sessions you use most to the top.
 - ↕️ **Sort** by last active, name, token use, cost, or your own custom order.
 - ☑️ **Multi-select** sessions for bulk archive, delete, colour, or move to a project.
@@ -61,6 +61,7 @@ instantly get the project and every conversation inside it.
 - ➕ New session in this project
 - 📋 Copy folder path
 - 📌 Pin / unpin
+- 🫥 Blur name (privacy)
 - 📁 Move to group (or create a new group)
 - ✏️ Rename
 - 🎨 Colour (presets, custom, or clear)
@@ -70,6 +71,7 @@ instantly get the project and every conversation inside it.
 **On a group**
 - ➕ New group
 - ✏️ Rename group
+- 🫥 Blur group (privacy)
 - 🎨 Group colour
 - 🗑️ Delete group (its projects move back to General projects)
 
