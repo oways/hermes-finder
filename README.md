@@ -100,8 +100,8 @@ hermes plugins install finder
 Copy the plugin file into your desktop plugins folder:
 
 ```bash
-mkdir -p ~/.hermes/desktop-plugins/finder
-cp desktop/plugin.js ~/.hermes/desktop-plugins/finder/plugin.js
+mkdir -p "$HERMES_HOME/desktop-plugins/finder"
+cp desktop/plugin.js "$HERMES_HOME/desktop-plugins/finder/plugin.js"
 ```
 
 Then open the Command Palette (Cmd/Ctrl + K), run **Reload desktop plugins**,

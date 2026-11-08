@@ -15,7 +15,7 @@
  * Data: `projects.tree` RPC (session.list fallback). Live refresh on
  * `projects.changed` / `sessions.changed`. State persists in ctx.storage.
  *
- * Install: ~/.hermes/desktop-plugins/finder/plugin.js  (folder name == id).
+ * Install: $HERMES_HOME/desktop-plugins/finder/plugin.js  (folder name == id).
  * Reload with Cmd/Ctrl+K -> "Reload desktop plugins".
  * Plain ESM, loaded uncompiled - UI is jsx() calls, not JSX syntax.
  */
