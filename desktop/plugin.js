@@ -861,6 +861,31 @@ function ContextMenu({ menu, ops }) {
       sep(),
       item('add', 'New group…', () => ops.setMenuMode('newgroup'))
     )
+  } else if (menu.mode === 'movesession') {
+    const currentCwd = String(menu.session?.cwd || '').trim()
+    const targets = (ops.projects || []).filter(p => p && !p.isNoProject && p.path && p.path !== currentCwd)
+    content = h(
+      'div',
+      { className: 'flex max-h-[300px] flex-col overflow-auto' },
+      heading('Move session to project'),
+      targets.length
+        ? targets.map(p =>
+            h(
+              'button',
+              {
+                key: p.id,
+                type: 'button',
+                onClick: () => ops.moveSessionToProject(menu.session.id, p),
+                className: 'flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[0.75rem] text-(--ui-text-secondary) transition-colors hover:bg-(--chrome-action-hover)'
+              },
+              h(Codicon, { name: 'folder', size: '0.8125rem', className: 'text-(--ui-text-tertiary)' }),
+              p.name
+            )
+          )
+        : h('div', { className: 'px-1.5 py-1 text-[0.75rem] text-(--ui-text-quaternary)' }, 'No other folder-backed projects'),
+      sep(),
+      item('arrow-left', 'Back', () => ops.setMenuMode('root'))
+    )
   } else if (menu.mode === 'confirm') {
     let msg
     if (menu.kind === 'project') msg = `Delete project "${menu.group?.name}"? Its sessions are kept (they just lose this grouping).`
@@ -923,6 +948,7 @@ function ContextMenu({ menu, ops }) {
       item('split-horizontal', 'Open in new tab', () => { openSession(s.id, 'tab'); ops.closeMenu() }),
       item('multiple-windows', 'Open in new window', () => { openSession(s.id, 'window'); ops.closeMenu() }),
       item('copy', 'Copy session id', () => { copyId(s.id); ops.closeMenu() }),
+      item('folder', 'Move to project…', () => ops.setMenuMode('movesession')),
       item(pinned ? 'pinned' : 'pin', pinned ? 'Unpin' : 'Pin', () => ops.togglePinSession(s.id)),
       h('div', { className: 'px-1 pt-1' }, heading('Tag colour'), colorSwatches(curColor, c => ops.setSessionColor(s.id, c), () => ops.setSessionColor(s.id, ''))),
       sep(),
@@ -1533,6 +1559,20 @@ function FinderPane() {
   const bulkArchive = useCallback(() => bulkRun('Archived', id => host.request('session.archive', { session_id: id, archived: true })), [bulkRun])
   const bulkDelete = useCallback(() => bulkRun('Deleted', id => host.request('session.delete', { session_id: id })), [bulkRun])
   const bulkMove = useCallback(cwd => bulkRun('Moved', id => host.request('session.workspace.move', { session_key: id, cwd })), [bulkRun])
+  const moveSessionToProject = useCallback(
+    (sessionId, project) => {
+      const cwd = String(project && project.path || '').trim()
+      setMenu(null)
+      if (!sessionId || !cwd) return
+      host.request('session.workspace.move', { session_key: sessionId, cwd })
+        .then(() => {
+          host.notify({ kind: 'success', message: `Session moved to ${project.name}` })
+          invalidate()
+        })
+        .catch(err => host.notify({ kind: 'error', message: `Could not move session: ${(err && err.message) || err}` }))
+    },
+    [invalidate]
+  )
   const bulkColor = useCallback(
     color => {
       setSessionColors(prev => {
@@ -1610,6 +1650,8 @@ function FinderPane() {
     setCollectionColor,
     archiveSession,
     newSessionInProject,
+    moveSessionToProject,
+    projects: data?.projects || [],
     moveTop,
     moveBottom,
     togglePinProject,

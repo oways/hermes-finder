@@ -33,7 +33,8 @@ instantly get the project and every conversation inside it.
   usual session fields: title, preview, folder, git branch, repo, source, model.
 - 🧭 **Three focused views** so you always see the right shape of your work.
 - 🖱️ **Right-click menus** for the actions you actually reach for: new session,
-  rename, recolour, reorder, archive, delete, copy id.
+  move a session to another project, rename, recolour, reorder, archive, delete,
+  copy id.
 - 📊 **Token and cost stats** per session and per project, with a running total.
 - 🫀 **Live context meter** for the chat you have open, so you can see how full
   the window is without leaving what you are doing.
