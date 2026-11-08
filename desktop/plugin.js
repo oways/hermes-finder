@@ -792,13 +792,12 @@ function ContextMenu({ menu, ops }) {
     )
   } else if (menu.mode === 'newproject') {
     let el = null
-    const cwd = String(host.state.cwd.get() || '').trim()
+    const folder = String(menu.folderPath || host.state.cwd.get() || '').trim()
     const commit = () => ops.commitNewProject(el ? el.value : '')
     content = h(
       'div',
       { className: 'flex flex-col gap-2 p-1' },
       heading('New project in this group'),
-      h('div', { className: 'max-w-[220px] text-[0.6875rem] text-(--ui-text-quaternary)' }, cwd ? `Folder: ${cwd}` : 'Open a workspace folder first. Hermes projects need a folder.'),
       h('input', {
         autoFocus: true,
         placeholder: 'Project name',
@@ -812,6 +811,24 @@ function ContextMenu({ menu, ops }) {
         },
         className: 'w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
       }),
+      h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'Project folder'),
+      h(
+        'div',
+        { className: 'flex gap-1' },
+        h('input', {
+          value: folder,
+          placeholder: '/path/to/project',
+          onChange: e => ops.setNewProjectFolder(e.target.value),
+          className: 'min-w-0 flex-1 rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.6875rem] text-foreground outline-none focus:border-(--ui-accent)'
+        }),
+        h('button', {
+          type: 'button',
+          title: 'Choose folder',
+          onClick: () => ops.pickProjectFolder(),
+          className: 'shrink-0 rounded-md border border-(--ui-stroke-secondary) px-2 text-(--ui-text-secondary) hover:bg-(--chrome-action-hover) hover:text-foreground'
+        }, h(Codicon, { name: 'folder', size: '0.8125rem' }))
+      ),
+      h('div', { className: 'max-w-[220px] text-[0.6875rem] text-(--ui-text-quaternary)' }, folder ? 'This folder becomes the project workspace.' : 'Choose a folder before creating the project.'),
       h(
         'div',
         { className: 'flex justify-end gap-1' },
@@ -1414,21 +1431,44 @@ function FinderPane() {
     },
     [menu, createGroup]
   )
+  const setNewProjectFolder = useCallback(
+    folderPath => setMenu(prev => prev ? { ...prev, folderPath: String(folderPath || '') } : prev),
+    []
+  )
+  const pickProjectFolder = useCallback(async () => {
+    const desktop = typeof window !== 'undefined' ? window.hermesDesktop : null
+    if (!desktop || typeof desktop.selectPaths !== 'function') {
+      host.notify({ kind: 'error', message: 'Folder picker is unavailable. Enter the folder path manually.' })
+      return
+    }
+    try {
+      const selected = await desktop.selectPaths({
+        directories: true,
+        multiple: false,
+        title: 'Choose project folder',
+        defaultPath: String(host.state.cwd.get() || '').trim() || undefined
+      })
+      const folder = Array.isArray(selected) ? String(selected[0] || '').trim() : ''
+      if (folder) setNewProjectFolder(folder)
+    } catch (err) {
+      host.notify({ kind: 'error', message: `Folder picker failed: ${(err && err.message) || err}` })
+    }
+  }, [host, setNewProjectFolder])
   const createProjectInGroup = useCallback(
-    (name, groupId) => {
+    (name, groupId, selectedFolder) => {
       const n = (name || '').trim()
-      const cwd = String(host.state.cwd.get() || '').trim()
+      const folder = String(selectedFolder || host.state.cwd.get() || '').trim()
       setMenu(null)
       if (!n) return
-      if (!cwd) {
-        host.notify({ kind: 'error', message: 'Open a workspace folder first, then create the project here.' })
+      if (!folder) {
+        host.notify({ kind: 'error', message: 'Choose a project folder before creating the project.' })
         return
       }
-      Promise.resolve(host.request('projects.create', { name: n, folders: [cwd], primary_path: cwd, use: false }))
+      Promise.resolve(host.request('projects.create', { name: n, folders: [folder], primary_path: folder, use: false }))
         .then(res => {
           const pid = res && res.project && res.project.id
           if (pid && groupId && groupId !== DEFAULT_GROUP_ID) setGroupOf(prev => ({ ...prev, [pid]: groupId }))
-          host.notify({ kind: 'success', message: 'Project created in the current workspace' })
+          host.notify({ kind: 'success', message: 'Project created with the selected folder' })
           invalidate()
         })
         .catch(err => host.notify({ kind: 'error', message: `projects.create failed: ${(err && err.message) || err}` }))
@@ -1438,7 +1478,7 @@ function FinderPane() {
   const commitNewProject = useCallback(
     name => {
       const m = menu
-      createProjectInGroup(name, m && m.kind === 'collection' ? m.coll.id : DEFAULT_GROUP_ID)
+      createProjectInGroup(name, m && m.kind === 'collection' ? m.coll.id : DEFAULT_GROUP_ID, m && m.folderPath)
     },
     [menu, createProjectInGroup]
   )
@@ -1562,6 +1602,8 @@ function FinderPane() {
     commitRename,
     commitNewGroup,
     commitNewProject,
+    setNewProjectFolder,
+    pickProjectFolder,
     commitDelete,
     setProjectColor,
     setSessionColor,

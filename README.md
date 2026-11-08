@@ -39,7 +39,7 @@ instantly get the project and every conversation inside it.
   the window is without leaving what you are doing.
 - 🎨 **Colours and custom order** that persist, plus drag to reorder projects.
 - ♻️ **Always fresh.** Updates live when projects or sessions change.
-- 🆕 **Create in place.** Header buttons start a New session or a New project (with an inline name field) without leaving Finder. Group-created projects follow Hermes' folder-backed project flow and use the current workspace folder.
+- 🆕 **Create in place.** Header buttons start a New session or a New project without leaving Finder. Group-created projects use the current workspace folder or the folder picker in the popup.
 - 📁 **Groups.** Every project lives in a group (default **General projects**); make your own groups and move projects between them.
 - 🫥 **Privacy / blur.** Hide sensitive names when screen-sharing by blurring titles **per project, per group, or all at once** (hover to reveal). Blur-all toggles from the header (eye) or Cmd/Ctrl+Alt+P; per-project and per-group blur live in the right-click menus.
 - 📌 **Pin** the projects and sessions you use most to the top.
