@@ -1524,14 +1524,35 @@ function FinderPane() {
     },
     [menu, createProjectInGroup]
   )
+  const deleteSessionCompat = useCallback(async sessionId => {
+    const desktop = typeof window !== 'undefined' ? window.hermesDesktop : null
+    if (!desktop || typeof desktop.api !== 'function') throw new Error('This Hermes build does not expose the session delete API')
+
+    const path = `/api/sessions/${encodeURIComponent(sessionId)}`
+    const snapshot = await desktop.api({ path: `${path}/mutation-snapshot` })
+    if (!snapshot || snapshot.exists === false) return { ok: true, already_absent: true }
+
+    const params = new URLSearchParams()
+    params.set('request_id', typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    if (snapshot.runtime_revision !== undefined && snapshot.runtime_revision !== null) params.set('expected_revision', String(snapshot.runtime_revision))
+    if (snapshot.runtime_generation !== undefined && snapshot.runtime_generation !== null) params.set('expected_generation', String(snapshot.runtime_generation))
+    return desktop.api({ path: `${path}?${params.toString()}`, method: 'DELETE' })
+  }, [])
   const commitDelete = useCallback(() => {
     const m = menu
     setMenu(null)
     if (!m) return
     if (m.kind === 'project') rpc('projects.delete', { id: m.group.id }, 'Project deleted')
     else if (m.kind === 'collection') deleteGroup(m.coll.id)
-    else rpc('session.delete', { session_id: m.session.id }, 'Session deleted')
-  }, [menu, rpc, deleteGroup])
+    else {
+      deleteSessionCompat(m.session.id)
+        .then(() => {
+          host.notify({ kind: 'success', message: 'Session deleted' })
+          invalidate()
+        })
+        .catch(err => host.notify({ kind: 'error', message: `Session delete failed: ${(err && err.message) || err}` }))
+    }
+  }, [menu, rpc, deleteGroup, deleteSessionCompat, invalidate, host])
 
   const setMenuMode = useCallback(mode => setMenu(prev => (prev ? { ...prev, mode } : prev)), [])
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -1573,7 +1594,7 @@ function FinderPane() {
     [selected, invalidate]
   )
   const bulkArchive = useCallback(() => bulkRun('Archived', id => host.request('session.archive', { session_id: id, archived: true })), [bulkRun])
-  const bulkDelete = useCallback(() => bulkRun('Deleted', id => host.request('session.delete', { session_id: id })), [bulkRun])
+  const bulkDelete = useCallback(() => bulkRun('Deleted', id => deleteSessionCompat(id)), [bulkRun, deleteSessionCompat])
   const bulkMove = useCallback(cwd => bulkRun('Moved', id => host.request('session.workspace.move', { session_key: id, cwd })), [bulkRun])
   const moveSessionToProject = useCallback(
     (sessionId, project) => {
