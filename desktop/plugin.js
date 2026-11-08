@@ -94,6 +94,18 @@ function ensureBlurStyle() {
 
 let storage = null
 
+// The palette command and keybind run OUTSIDE the React tree, so a direct
+// storage write would not update the mounted pane (usePersisted only reads on
+// mount). Notify live panes through this tiny bus.
+const privacyListeners = new Set()
+function broadcastPrivacy(val) {
+  privacyListeners.forEach(fn => {
+    try {
+      fn(val)
+    } catch {}
+  })
+}
+
 // -- hyperscript: key -> 3rd jsx arg; jsxs for an array child. -------------------
 function h(type, props, ...kids) {
   const p = props ? { ...props } : {}
@@ -1069,6 +1081,12 @@ function FinderPane() {
     return () => disposers.forEach(d => typeof d === 'function' && d())
   }, [qc])
 
+  useEffect(() => {
+    const fn = val => setPrivacy(() => val)
+    privacyListeners.add(fn)
+    return () => privacyListeners.delete(fn)
+  }, [setPrivacy])
+
   const needle = query.trim().toLowerCase()
   const grouped = scope !== 'sessions'
   const canOrder = !needle && grouped && sortKey === 'manual'
@@ -1664,11 +1682,14 @@ export default {
     }
 
     const togglePrivacy = () => {
+      let next = true
       try {
         const cur = storage ? storage.get(PRIVACY_KEY, false) : false
-        storage && storage.set(PRIVACY_KEY, !cur)
-        host.notify({ kind: 'info', message: `Finder privacy mode ${!cur ? 'on' : 'off'}` })
+        next = !cur
+        storage && storage.set(PRIVACY_KEY, next)
       } catch {}
+      broadcastPrivacy(next)
+      host.notify({ kind: 'info', message: `Finder blur-all ${next ? 'on' : 'off'}` })
       reveal()
     }
 
