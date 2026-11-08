@@ -41,6 +41,11 @@ instantly get the project and every conversation inside it.
 - 🎨 **Colours and custom order** that persist, plus drag to reorder projects.
 - ♻️ **Always fresh.** Updates live when projects or sessions change.
 - 🆕 **Create in place.** Header buttons start a New session or a New project (with an inline name field) without leaving Finder.
+- 📁 **Groups.** Every project lives in a group (default **General projects**); make your own groups and move projects between them.
+- 🫥 **Privacy mode.** Blur every title at once for screen-sharing, streaming or screenshots (hover to reveal). Toggle with Cmd/Ctrl+Alt+P.
+- 📌 **Pin** the projects and sessions you use most to the top.
+- ↕️ **Sort** by last active, name, token use, cost, or your own custom order.
+- ☑️ **Multi-select** sessions for bulk archive, delete, colour, or move to a project.
 
 ## 🧭 The three tabs
 
@@ -55,14 +60,23 @@ instantly get the project and every conversation inside it.
 **On a project**
 - ➕ New session in this project
 - 📋 Copy folder path
+- 📌 Pin / unpin
+- 📁 Move to group (or create a new group)
 - ✏️ Rename
 - 🎨 Colour (presets, custom, or clear)
-- ⬆️ Move to top / ⬇️ Move to bottom (or just drag the handle)
+- ⬆️ Move to top / ⬇️ Move to bottom (or drag the handle, in custom-order mode)
 - 🗑️ Delete project (your sessions are kept, they only lose the grouping)
+
+**On a group**
+- ➕ New group
+- ✏️ Rename group
+- 🎨 Group colour
+- 🗑️ Delete group (its projects move back to General projects)
 
 **On a session**
 - 💬 Open, in a new tab, or in a new window
 - 📋 Copy session id
+- 📌 Pin / unpin
 - 🎨 Tag colour
 - 📦 Archive
 - 🗑️ Delete

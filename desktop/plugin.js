@@ -1,19 +1,19 @@
 /**
- * Finder - unified search for Projects & Sessions, as a dock TAB.
+ * Finder - search, organise, and manage Projects & Sessions, as a dock TAB.
  *
- * Docks in the Sessions strip (SESSIONS | BOTS | FINDER), like Bots. Tabs:
- *   - All      : projects grouped (incl. the project-less bucket), expandable.
- *   - Projects : real projects only, each expandable to its sessions.
- *   - Sessions : a FLAT list of every session, no grouping (project shown as a tag).
+ * Docks in the Sessions strip (SESSIONS | BOTS | FINDER). Tabs:
+ *   - All      : collections of projects (incl. the project-less bucket), expandable.
+ *   - Projects : collections of real projects, each expandable to its sessions.
+ *   - Sessions : a FLAT list of every session (project shown as a tag).
  *
  * Search matches project names (core can't) + session text, bridged by project.
- * Right-click a project  -> New session here / Rename / Colour / Move / Delete.
- * Right-click a session  -> Open (tab/window) / Colour / Archive / Delete.
- * Extras: token+cost stats, a live context meter for the open chat, drag-drop
- * project reorder (grip handle), all persisted in ctx.storage.
+ * Collections (groups): every project lives in a group; the default is
+ *   "General projects". Add, rename, recolour, delete groups; move projects
+ *   between them. Pins, a sort toggle, a privacy (blur) mode, and multi-select
+ *   bulk actions (archive / delete / colour / move) are all available.
  *
  * Data: `projects.tree` RPC (session.list fallback). Live refresh on
- * `projects.changed` / `sessions.changed`.
+ * `projects.changed` / `sessions.changed`. State persists in ctx.storage.
  *
  * Install: ~/.hermes/desktop-plugins/finder/plugin.js  (folder name == id).
  * Reload with Cmd/Ctrl+K -> "Reload desktop plugins".
@@ -45,14 +45,36 @@ const PANE_ID = `${ID}:pane`
 const PREVIEW_LIMIT = 2000
 const SESSION_LIMIT = 5000
 const FLAT_CAP = 600
+
 const ORDER_KEY = 'projectOrder'
 const STATS_KEY = 'showStats'
 const SCOLORS_KEY = 'sessionColors'
+const PINP_KEY = 'pinnedProjects'
+const PINS_KEY = 'pinnedSessions'
+const SORT_KEY = 'sortKey'
+const PRIVACY_KEY = 'privacy'
+const GROUPS_KEY = 'groups'
+const GROUPOF_KEY = 'groupOf'
+const COLLAPSED_KEY = 'collapsedGroups'
+
+const DEFAULT_GROUP_ID = 'general'
+const DEFAULT_GROUP_NAME = 'General projects'
+
+const SORTS = [
+  ['manual', 'Custom order'],
+  ['recent', 'Last active'],
+  ['name', 'Name (A to Z)'],
+  ['tokens', 'Token use'],
+  ['cost', 'Cost']
+]
+const SORT_LABEL = Object.fromEntries(SORTS)
 
 const COLOR_PRESETS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6',
   '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#64748b'
 ]
+
+const BLUR = 'blur-sm hover:blur-none transition-[filter] duration-150'
 
 let storage = null
 
@@ -197,6 +219,19 @@ function usePersisted(key, fallback) {
   return [value, set]
 }
 
+// -- groups helpers --------------------------------------------------------------
+function ensureGroups(list) {
+  const arr = Array.isArray(list) ? list.filter(g => g && g.id && g.name) : []
+  if (!arr.some(g => g.id === DEFAULT_GROUP_ID)) {
+    arr.unshift({ id: DEFAULT_GROUP_ID, name: DEFAULT_GROUP_NAME })
+  }
+  return arr
+}
+
+function newGroupId() {
+  return `g_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+}
+
 // -- data ----------------------------------------------------------------------
 function normalizeNode(node) {
   return {
@@ -274,6 +309,51 @@ function sessionText(s) {
     .toLowerCase()
 }
 
+// -- sorting -------------------------------------------------------------------
+function sortProjects(list, sortKey, order, pinned) {
+  const manual = p => {
+    const i = order.indexOf(p.id)
+    return i === -1 ? [1, -(p.lastActive || 0)] : [0, i]
+  }
+  return list.slice().sort((a, b) => {
+    const pa = pinned[a.id] ? 0 : 1
+    const pb = pinned[b.id] ? 0 : 1
+    if (pa !== pb) return pa - pb
+    switch (sortKey) {
+      case 'name':
+        return a.name.localeCompare(b.name)
+      case 'tokens':
+        return (b.totalTokens || 0) - (a.totalTokens || 0)
+      case 'cost':
+        return (b.totalCostUsd || 0) - (a.totalCostUsd || 0)
+      case 'recent':
+        return (b.lastActive || 0) - (a.lastActive || 0)
+      default: {
+        const ra = manual(a)
+        const rb = manual(b)
+        return ra[0] - rb[0] || ra[1] - rb[1]
+      }
+    }
+  })
+}
+
+function sortSessions(list, sortKey, pinned) {
+  return list.slice().sort((a, b) => {
+    const pa = pinned[a.id] || a.pinned ? 0 : 1
+    const pb = pinned[b.id] || b.pinned ? 0 : 1
+    if (pa !== pb) return pa - pb
+    switch (sortKey) {
+      case 'name':
+        return (a.title || '').localeCompare(b.title || '')
+      case 'tokens':
+      case 'cost':
+        return (b.tokens || 0) - (a.tokens || 0)
+      default:
+        return (b.lastActive || 0) - (a.lastActive || 0)
+    }
+  })
+}
+
 // -- live context meter for the open chat ----------------------------------------
 function ActiveContextChip() {
   const usage = useValue(host.state.focusedUsage)
@@ -301,8 +381,10 @@ function ActiveContextChip() {
 
 // -- session row -----------------------------------------------------------------
 function renderSession(s, ops) {
-  const { needle, showStats, focusedId, flat, sessionColors } = ops
+  const { needle, showStats, focusedId, flat, sessionColors, privacy, selectMode, selected } = ops
   const active = s.id === focusedId
+  const isSel = selectMode && selected && selected.has(s.id)
+  const pinnedHere = (ops.pinnedSessions && ops.pinnedSessions[s.id]) || s.pinned
   const customColor = sessionColors && sessionColors[s.id]
   const title = s.title || '(untitled)'
   const metaBits = []
@@ -315,13 +397,36 @@ function renderSession(s, ops) {
   if (active) metaBits.push('open now')
 
   const dotStyle = customColor ? { backgroundColor: customColor } : undefined
+  const lead = selectMode
+    ? h(
+        'span',
+        {
+          className: cn(
+            'mt-0.5 flex size-3.5 shrink-0 items-center justify-center rounded border',
+            isSel ? 'border-(--ui-accent) bg-(--ui-accent)' : 'border-(--ui-stroke-secondary)'
+          )
+        },
+        isSel ? h(Codicon, { name: 'check', size: '0.6875rem', className: 'text-white' }) : null
+      )
+    : h('span', {
+        className: cn(
+          'mt-1.5 size-1.5 shrink-0 rounded-full',
+          !customColor && (active || s.unread) ? 'bg-(--ui-accent)' : '',
+          !customColor && !active && !s.unread ? 'bg-(--ui-text-quaternary) opacity-50' : ''
+        ),
+        style: dotStyle
+      })
+
   return h(
     'button',
     {
       key: s.id,
       type: 'button',
       title: s.cwd || title,
-      onClick: e => openSession(s.id, intentFromEvent(e)),
+      onClick: e => {
+        if (selectMode) ops.onToggleSelect(s.id)
+        else openSession(s.id, intentFromEvent(e))
+      },
       onContextMenu: e => {
         e.preventDefault()
         e.stopPropagation()
@@ -330,37 +435,31 @@ function renderSession(s, ops) {
       className: cn(
         'group/sess flex w-full items-start gap-2 rounded-md py-1.5 text-left transition-colors',
         flat ? 'px-2' : 'pl-6 pr-2',
-        active ? 'bg-(--chrome-action-hover)' : 'hover:bg-(--chrome-action-hover)'
+        isSel ? 'bg-(--chrome-action-hover)' : active ? 'bg-(--chrome-action-hover)' : 'hover:bg-(--chrome-action-hover)'
       )
     },
-    h('span', {
-      className: cn(
-        'mt-1.5 size-1.5 shrink-0 rounded-full',
-        !customColor && (active || s.unread) ? 'bg-(--ui-accent)' : '',
-        !customColor && !active && !s.unread ? 'bg-(--ui-text-quaternary) opacity-50' : ''
-      ),
-      style: dotStyle
-    }),
+    lead,
     h(
       'span',
       { className: 'flex min-w-0 flex-1 flex-col' },
       h(
         'span',
         { className: 'flex items-center gap-1.5' },
-        s.pinned ? h(Codicon, { name: 'pinned', size: '0.75rem', className: 'shrink-0 text-(--ui-text-quaternary)' }) : null,
+        pinnedHere ? h(Codicon, { name: 'pinned', size: '0.75rem', className: 'shrink-0 text-(--ui-text-quaternary)' }) : null,
         h(
           'span',
           {
             className: cn(
               'truncate text-[0.8125rem] leading-tight',
-              s.title ? 'text-(--ui-text-secondary)' : 'text-(--ui-text-quaternary) italic'
+              s.title ? 'text-(--ui-text-secondary)' : 'text-(--ui-text-quaternary) italic',
+              privacy && BLUR
             )
           },
           highlight(title, needle)
         )
       ),
       s.preview
-        ? h('span', { className: 'truncate text-[0.6875rem] leading-tight text-(--ui-text-quaternary)' }, highlight(s.preview, needle))
+        ? h('span', { className: cn('truncate text-[0.6875rem] leading-tight text-(--ui-text-quaternary)', privacy && BLUR) }, highlight(s.preview, needle))
         : null,
       metaBits.length
         ? h('span', { className: 'mt-0.5 truncate text-[0.625rem] leading-tight text-(--ui-text-quaternary)' }, metaBits.join('  ·  '))
@@ -369,9 +468,11 @@ function renderSession(s, ops) {
   )
 }
 
-// -- project group ----------------------------------------------------------------
+// -- project node ----------------------------------------------------------------
 function renderGroup(group, ops) {
-  const { needle, expanded, showStats, dragOverId, canOrder } = ops
+  const { needle, showStats, dragOverId, canOrder, privacy } = ops
+  const expanded = ops.isExpanded(group.id)
+  const pinnedHere = ops.pinnedProjects && ops.pinnedProjects[group.id]
   const dotStyle = group.color ? { backgroundColor: group.color } : undefined
   const chevron = expanded ? 'chevron-down' : 'chevron-right'
   const iconName = group.isNoProject ? 'inbox' : group.isAuto ? 'git-branch' : 'folder'
@@ -395,8 +496,7 @@ function renderGroup(group, ops) {
             e.stopPropagation()
             ops.onProjectMenu(e.clientX, e.clientY, group)
           },
-      // drop target
-      onDragOver: canOrder && !group.isNoProject
+      onDragOver: draggable
         ? e => {
             e.preventDefault()
             try {
@@ -405,7 +505,7 @@ function renderGroup(group, ops) {
             ops.onDragOver(group.id)
           }
         : undefined,
-      onDrop: canOrder && !group.isNoProject
+      onDrop: draggable
         ? e => {
             e.preventDefault()
             ops.onDrop(group.id)
@@ -413,7 +513,6 @@ function renderGroup(group, ops) {
         : undefined,
       onDragEnd: canOrder ? () => ops.onDragOver(null) : undefined
     },
-    // drag handle (only when ordering is possible)
     draggable
       ? h(
           'span',
@@ -447,7 +546,8 @@ function renderGroup(group, ops) {
       group.color
         ? h('span', { className: 'size-2.5 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: iconName, size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
-      h('span', { className: 'min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground' }, highlight(group.name, needle)),
+      pinnedHere ? h(Codicon, { name: 'pinned', size: '0.75rem', className: 'shrink-0 text-(--ui-text-quaternary)' }) : null,
+      h('span', { className: cn('min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground', privacy && BLUR) }, highlight(group.name, needle)),
       h(Badge, { className: 'shrink-0' }, String(group.sessionCount))
     ),
     group.isNoProject
@@ -486,11 +586,103 @@ function renderGroup(group, ops) {
   return h('div', { key: group.id, className: 'select-none' }, header, statsLine, body)
 }
 
-// -- context menu (projects + sessions) ------------------------------------------
+// -- collection (user group) ------------------------------------------------------
+function renderCollection(coll, ops) {
+  const expanded = ops.isCollExpanded(coll.id)
+  const chevron = expanded ? 'chevron-down' : 'chevron-right'
+  const dotStyle = coll.color ? { backgroundColor: coll.color } : undefined
+
+  const header = h(
+    'div',
+    {
+      className: 'flex items-center gap-0.5 rounded-md',
+      onContextMenu: e => {
+        e.preventDefault()
+        e.stopPropagation()
+        ops.onCollectionMenu(e.clientX, e.clientY, coll)
+      }
+    },
+    h(
+      'button',
+      {
+        type: 'button',
+        onClick: () => ops.onToggleColl(coll.id),
+        className: 'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-1 text-left transition-colors hover:bg-(--chrome-action-hover)'
+      },
+      h(Codicon, { name: chevron, size: '0.8125rem', className: 'shrink-0 text-(--ui-text-quaternary)' }),
+      coll.color
+        ? h('span', { className: 'size-2 shrink-0 rounded-full', style: dotStyle })
+        : h(Codicon, { name: 'layers', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
+      h('span', { className: 'min-w-0 flex-1 truncate text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)' }, highlight(coll.name, ops.needle)),
+      h('span', { className: 'shrink-0 text-[0.625rem] text-(--ui-text-quaternary)' }, `${coll.projects.length}p · ${coll.sessionCount}s`)
+    ),
+    h(
+      'button',
+      {
+        type: 'button',
+        title: 'Group options (or right-click)',
+        onClick: e => {
+          e.stopPropagation()
+          ops.onCollectionMenu(e.clientX, e.clientY, coll)
+        },
+        className: 'shrink-0 rounded-md p-1 text-(--ui-text-quaternary) transition-colors hover:bg-(--chrome-action-hover) hover:text-foreground'
+      },
+      h(Codicon, { name: 'kebab-vertical', size: '0.75rem' })
+    )
+  )
+
+  const body =
+    expanded
+      ? coll.projects.length
+        ? h('div', { className: 'flex flex-col gap-0.5 pl-2' }, ...coll.projects.map(p => renderGroup(p, ops)))
+        : h('div', { className: 'py-1 pl-6 text-[0.6875rem] text-(--ui-text-quaternary)' }, 'No projects in this group. Right-click a project to move it here.')
+      : null
+
+  return h('div', { key: `coll-${coll.id}`, className: 'select-none' }, header, body)
+}
+
+// -- colour swatch row (shared) --------------------------------------------------
+function colorSwatches(current, onPick, onClear) {
+  return h(
+    'div',
+    { className: 'flex flex-wrap items-center gap-1.5' },
+    ...COLOR_PRESETS.map(c =>
+      h('button', {
+        key: c,
+        type: 'button',
+        title: c,
+        onClick: () => onPick(c),
+        className: cn('size-5 rounded-full border transition-transform hover:scale-110', current === c ? 'border-foreground' : 'border-(--ui-stroke-secondary)'),
+        style: { backgroundColor: c }
+      })
+    ),
+    h(
+      'button',
+      {
+        type: 'button',
+        title: 'Clear colour',
+        onClick: () => onClear(),
+        className: cn('flex size-5 items-center justify-center rounded-full border', !current ? 'border-foreground' : 'border-(--ui-stroke-secondary)')
+      },
+      h(Codicon, { name: 'circle-slash', size: '0.75rem', className: 'text-(--ui-text-quaternary)' })
+    ),
+    h(
+      'label',
+      {
+        title: 'Custom colour',
+        className: 'relative size-5 cursor-pointer overflow-hidden rounded-full border border-(--ui-stroke-secondary)',
+        style: { background: 'conic-gradient(red, orange, yellow, lime, cyan, blue, magenta, red)' }
+      },
+      h('input', { type: 'color', value: current || '#3b82f6', onChange: e => onPick(e.target.value), className: 'absolute inset-0 cursor-pointer opacity-0' })
+    )
+  )
+}
+
+// -- context menu (projects + sessions + collections) ----------------------------
 function ContextMenu({ menu, ops }) {
   if (!menu) return null
-  const MW = 240
-  const MH = 320
+  const MW = 244
+  const MH = 380
   const left = Math.max(8, Math.min(menu.x, window.innerWidth - MW - 8))
   const top = Math.max(8, Math.min(menu.y, window.innerHeight - MH - 8))
 
@@ -510,28 +702,29 @@ function ContextMenu({ menu, ops }) {
     )
 
   const sep = () => h('div', { className: 'my-1 border-t border-(--ui-stroke-secondary)' })
+  const heading = label => h('div', { className: 'px-1.5 pb-0.5 pt-1 text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)' }, label)
 
   let content
   if (menu.mode === 'rename') {
-    let renameEl = null
-    const commit = () => ops.commitRename(renameEl ? renameEl.value : '')
+    let el = null
+    const commit = () => ops.commitRename(el ? el.value : '')
+    const current = menu.kind === 'collection' ? menu.coll?.name : menu.group?.name
     content = h(
       'div',
       { className: 'flex flex-col gap-2 p-1' },
-      h('div', { className: 'px-1 text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)' }, 'Rename project'),
+      heading(menu.kind === 'collection' ? 'Rename group' : 'Rename project'),
       h('input', {
         autoFocus: true,
-        defaultValue: menu.group?.name || '',
+        defaultValue: current || '',
         onKeyDown: e => {
           if (e.key === 'Enter') commit()
           else if (e.key === 'Escape') ops.setMenuMode('root')
         },
-        ref: el => {
-          renameEl = el
-          if (el) el.focus()
+        ref: node => {
+          el = node
+          if (node) node.focus()
         },
-        className:
-          'w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
+        className: 'w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
       }),
       h(
         'div',
@@ -540,18 +733,67 @@ function ContextMenu({ menu, ops }) {
         h('button', { type: 'button', onClick: commit, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Save')
       )
     )
-  } else if (menu.mode === 'confirm') {
-    const name = menu.kind === 'project' ? menu.group?.name : menu.session?.title || 'this session'
+  } else if (menu.mode === 'newgroup') {
+    let el = null
+    const commit = () => ops.commitNewGroup(el ? el.value : '')
     content = h(
       'div',
       { className: 'flex flex-col gap-2 p-1' },
+      heading('New group'),
+      h('input', {
+        autoFocus: true,
+        placeholder: 'Group name',
+        onKeyDown: e => {
+          if (e.key === 'Enter') commit()
+          else if (e.key === 'Escape') ops.setMenuMode(menu.kind === 'project' ? 'movegroup' : 'root')
+        },
+        ref: node => {
+          el = node
+          if (node) node.focus()
+        },
+        className: 'w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
+      }),
       h(
         'div',
-        { className: 'px-1 text-[0.75rem] text-(--ui-text-secondary)' },
-        menu.kind === 'project'
-          ? `Delete project "${name}"? Its sessions are kept (they just lose this grouping).`
-          : `Delete "${name}" and its transcript? This cannot be undone.`
+        { className: 'flex justify-end gap-1' },
+        h('button', { type: 'button', onClick: () => ops.setMenuMode(menu.kind === 'project' ? 'movegroup' : 'root'), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel'),
+        h('button', { type: 'button', onClick: commit, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Create')
+      )
+    )
+  } else if (menu.mode === 'movegroup') {
+    const curGid = (ops.groupOf && ops.groupOf[menu.group.id]) || DEFAULT_GROUP_ID
+    content = h(
+      'div',
+      { className: 'flex max-h-[300px] flex-col overflow-auto' },
+      heading('Move to group'),
+      ...(ops.groups || []).map(g =>
+        h(
+          'button',
+          {
+            key: g.id,
+            type: 'button',
+            onClick: () => ops.moveProjectToGroup(menu.group.id, g.id),
+            className: cn(
+              'flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[0.75rem] transition-colors hover:bg-(--chrome-action-hover)',
+              g.id === curGid ? 'text-foreground' : 'text-(--ui-text-secondary)'
+            )
+          },
+          h(Codicon, { name: g.id === curGid ? 'check' : 'layers', size: '0.8125rem', className: g.id === curGid ? 'text-(--ui-accent)' : 'text-(--ui-text-tertiary)' }),
+          g.name
+        )
       ),
+      sep(),
+      item('add', 'New group…', () => ops.setMenuMode('newgroup'))
+    )
+  } else if (menu.mode === 'confirm') {
+    let msg
+    if (menu.kind === 'project') msg = `Delete project "${menu.group?.name}"? Its sessions are kept (they just lose this grouping).`
+    else if (menu.kind === 'collection') msg = `Delete group "${menu.coll?.name}"? Its projects move back to ${DEFAULT_GROUP_NAME}.`
+    else msg = `Delete "${menu.session?.title || 'this session'}" and its transcript? This cannot be undone.`
+    content = h(
+      'div',
+      { className: 'flex flex-col gap-2 p-1' },
+      h('div', { className: 'px-1 text-[0.75rem] text-(--ui-text-secondary)' }, msg),
       h(
         'div',
         { className: 'flex justify-end gap-1' },
@@ -559,65 +801,42 @@ function ContextMenu({ menu, ops }) {
         h('button', { type: 'button', onClick: () => ops.commitDelete(), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-danger,#ef4444) hover:bg-(--chrome-action-hover)' }, 'Delete')
       )
     )
+  } else if (menu.kind === 'collection') {
+    const c = menu.coll
+    content = h(
+      'div',
+      { className: 'flex flex-col' },
+      item('add', 'New group…', () => ops.setMenuMode('newgroup')),
+      item('edit', 'Rename group…', () => ops.setMenuMode('rename')),
+      h('div', { className: 'px-1 pt-1' }, heading('Group colour'), colorSwatches(c.color, col => ops.setCollectionColor(c.id, col), () => ops.setCollectionColor(c.id, ''))),
+      c.id === DEFAULT_GROUP_ID ? null : sep(),
+      c.id === DEFAULT_GROUP_ID ? null : item('trash', 'Delete group', () => ops.setMenuMode('confirm'), true)
+    )
   } else if (menu.kind === 'project') {
     const g = menu.group
+    const pinned = ops.pinnedProjects && ops.pinnedProjects[g.id]
     const colorRow = g.editable
-      ? h(
-          'div',
-          { className: 'px-1 pt-1' },
-          h('div', { className: 'mb-1 text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)' }, 'Colour'),
-          h(
-            'div',
-            { className: 'flex flex-wrap items-center gap-1.5' },
-            ...COLOR_PRESETS.map(c =>
-              h('button', {
-                key: c,
-                type: 'button',
-                title: c,
-                onClick: () => ops.setProjectColor(g.id, c),
-                className: cn('size-5 rounded-full border transition-transform hover:scale-110', g.color === c ? 'border-foreground' : 'border-(--ui-stroke-secondary)'),
-                style: { backgroundColor: c }
-              })
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                title: 'Default (no colour)',
-                onClick: () => ops.setProjectColor(g.id, ''),
-                className: cn('flex size-5 items-center justify-center rounded-full border', !g.color ? 'border-foreground' : 'border-(--ui-stroke-secondary)')
-              },
-              h(Codicon, { name: 'circle-slash', size: '0.75rem', className: 'text-(--ui-text-quaternary)' })
-            ),
-            h(
-              'label',
-              {
-                title: 'Custom colour',
-                className: 'relative size-5 cursor-pointer overflow-hidden rounded-full border border-(--ui-stroke-secondary)',
-                style: { background: 'conic-gradient(red, orange, yellow, lime, cyan, blue, magenta, red)' }
-              },
-              h('input', { type: 'color', value: g.color || '#3b82f6', onChange: e => ops.setProjectColor(g.id, e.target.value), className: 'absolute inset-0 cursor-pointer opacity-0' })
-            )
-          )
-        )
+      ? h('div', { className: 'px-1 pt-1' }, heading('Colour'), colorSwatches(g.color, c => ops.setProjectColor(g.id, c), () => ops.setProjectColor(g.id, '')))
       : null
-
     content = h(
       'div',
       { className: 'flex flex-col' },
       g.path ? item('add', 'New session here', () => ops.newSessionInProject(g)) : null,
       g.path ? item('copy', 'Copy folder path', () => { copyText(g.path, 'Folder path copied'); ops.closeMenu() }) : null,
+      item(pinned ? 'pinned' : 'pin', pinned ? 'Unpin project' : 'Pin project', () => ops.togglePinProject(g.id)),
+      item('layers', 'Move to group…', () => ops.setMenuMode('movegroup')),
       g.editable ? item('edit', 'Rename…', () => ops.setMenuMode('rename')) : null,
       colorRow,
-      colorRow || g.editable || g.path ? sep() : null,
-      item('fold-up', 'Move to top', () => ops.moveTop(g.id)),
-      item('fold-down', 'Move to bottom', () => ops.moveBottom(g.id)),
+      sep(),
+      ops.canOrder ? item('fold-up', 'Move to top', () => ops.moveTop(g.id)) : null,
+      ops.canOrder ? item('fold-down', 'Move to bottom', () => ops.moveBottom(g.id)) : null,
       g.editable ? sep() : null,
       g.editable ? item('trash', 'Delete project', () => ops.setMenuMode('confirm'), true) : null
     )
   } else {
     const s = menu.session
     const curColor = ops.sessionColors && ops.sessionColors[s.id]
+    const pinned = ops.pinnedSessions && ops.pinnedSessions[s.id]
     content = h(
       'div',
       { className: 'flex flex-col' },
@@ -625,36 +844,8 @@ function ContextMenu({ menu, ops }) {
       item('split-horizontal', 'Open in new tab', () => { openSession(s.id, 'tab'); ops.closeMenu() }),
       item('multiple-windows', 'Open in new window', () => { openSession(s.id, 'window'); ops.closeMenu() }),
       item('copy', 'Copy session id', () => { copyId(s.id); ops.closeMenu() }),
-      sep(),
-      h(
-        'div',
-        { className: 'px-1 pt-1' },
-        h('div', { className: 'mb-1 text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)' }, 'Tag colour'),
-        h(
-          'div',
-          { className: 'flex flex-wrap items-center gap-1.5' },
-          ...COLOR_PRESETS.map(c =>
-            h('button', {
-              key: c,
-              type: 'button',
-              title: c,
-              onClick: () => ops.setSessionColor(s.id, c),
-              className: cn('size-5 rounded-full border transition-transform hover:scale-110', curColor === c ? 'border-foreground' : 'border-(--ui-stroke-secondary)'),
-              style: { backgroundColor: c }
-            })
-          ),
-          h(
-            'button',
-            {
-              type: 'button',
-              title: 'Clear tag',
-              onClick: () => ops.setSessionColor(s.id, ''),
-              className: cn('flex size-5 items-center justify-center rounded-full border', !curColor ? 'border-foreground' : 'border-(--ui-stroke-secondary)')
-            },
-            h(Codicon, { name: 'circle-slash', size: '0.75rem', className: 'text-(--ui-text-quaternary)' })
-          )
-        )
-      ),
+      item(pinned ? 'pinned' : 'pin', pinned ? 'Unpin' : 'Pin', () => ops.togglePinSession(s.id)),
+      h('div', { className: 'px-1 pt-1' }, heading('Tag colour'), colorSwatches(curColor, c => ops.setSessionColor(s.id, c), () => ops.setSessionColor(s.id, ''))),
       sep(),
       item('archive', 'Archive', () => ops.archiveSession(s.id)),
       item('trash', 'Delete', () => ops.setMenuMode('confirm'), true)
@@ -668,14 +859,123 @@ function ContextMenu({ menu, ops }) {
     h(
       'div',
       {
-        className:
-          'fixed z-50 w-[240px] rounded-lg border border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) p-1 shadow-md backdrop-blur-md',
+        className: 'fixed z-50 w-[244px] rounded-lg border border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) p-1 shadow-md backdrop-blur-md',
         style: { left: `${left}px`, top: `${top}px` },
         onClick: e => e.stopPropagation(),
         onContextMenu: e => e.preventDefault()
       },
       content
     )
+  )
+}
+
+// -- sort menu -------------------------------------------------------------------
+function SortMenu({ at, sortKey, order, ops }) {
+  if (!at) return null
+  const MW = 200
+  const left = Math.max(8, Math.min(at.x, window.innerWidth - MW - 8))
+  const top = Math.max(8, Math.min(at.y, window.innerHeight - 260))
+  return h(
+    'div',
+    null,
+    h('div', { className: 'fixed inset-0 z-40', onClick: () => ops.close(), onContextMenu: e => { e.preventDefault(); ops.close() } }),
+    h(
+      'div',
+      {
+        className: 'fixed z-50 w-[200px] rounded-lg border border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) p-1 shadow-md backdrop-blur-md',
+        style: { left: `${left}px`, top: `${top}px` },
+        onClick: e => e.stopPropagation()
+      },
+      h('div', { className: 'px-1.5 pb-0.5 pt-1 text-[0.625rem] uppercase tracking-wide text-(--ui-text-quaternary)' }, 'Sort by'),
+      ...SORTS.map(([key, label]) =>
+        h(
+          'button',
+          {
+            key,
+            type: 'button',
+            onClick: () => ops.setSort(key),
+            className: cn(
+              'flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[0.75rem] transition-colors hover:bg-(--chrome-action-hover)',
+              key === sortKey ? 'text-foreground' : 'text-(--ui-text-secondary)'
+            )
+          },
+          h(Codicon, { name: key === sortKey ? 'check' : 'blank', size: '0.8125rem', className: key === sortKey ? 'text-(--ui-accent)' : 'text-(--ui-text-tertiary)' }),
+          label
+        )
+      ),
+      order && order.length
+        ? h(
+            'div',
+            null,
+            h('div', { className: 'my-1 border-t border-(--ui-stroke-secondary)' }),
+            h('button', { type: 'button', onClick: () => ops.resetOrder(), className: 'flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[0.75rem] text-(--ui-text-secondary) hover:bg-(--chrome-action-hover)' }, h(Codicon, { name: 'clear-all', size: '0.8125rem', className: 'text-(--ui-text-tertiary)' }), 'Reset custom order')
+          )
+        : null
+    )
+  )
+}
+
+// -- bulk action bar -------------------------------------------------------------
+function BulkBar({ count, targets, ops }) {
+  const [mode, setMode] = useState(null)
+  const btn = (icon, label, onClick, danger) =>
+    h(
+      Tip,
+      { label },
+      h(
+        'button',
+        {
+          type: 'button',
+          onClick,
+          className: cn('rounded-md p-1 transition-colors hover:bg-(--chrome-action-hover)', danger ? 'text-(--ui-danger,#ef4444)' : 'text-(--ui-text-secondary) hover:text-foreground')
+        },
+        h(Codicon, { name: icon, size: '0.8125rem' })
+      )
+    )
+  return h(
+    'div',
+    { className: 'flex flex-col gap-1 border-b border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) px-2.5 py-1.5' },
+    h(
+      'div',
+      { className: 'flex items-center gap-1' },
+      h('span', { className: 'text-[0.75rem] font-medium text-foreground' }, `${count} selected`),
+      h('div', { className: 'flex-1' }),
+      btn('archive', 'Archive selected', () => ops.bulkArchive()),
+      btn('symbol-color', 'Colour selected', () => setMode(m => (m === 'color' ? null : 'color'))),
+      targets.length ? btn('folder', 'Move selected to a project', () => setMode(m => (m === 'move' ? null : 'move'))) : null,
+      btn('trash', 'Delete selected', () => setMode('confirm'), true),
+      btn('close', 'Clear selection', () => ops.clearSelection())
+    ),
+    mode === 'color'
+      ? h('div', { className: 'pb-0.5' }, colorSwatches(null, c => { ops.bulkColor(c); setMode(null) }, () => { ops.bulkColor(''); setMode(null) }))
+      : null,
+    mode === 'move'
+      ? h(
+          'select',
+          {
+            className: 'w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.75rem] text-foreground outline-none',
+            defaultValue: '',
+            onChange: e => {
+              const v = e.target.value
+              if (v) {
+                ops.bulkMove(v)
+                setMode(null)
+              }
+            }
+          },
+          h('option', { value: '', disabled: true }, 'Move to project…'),
+          ...targets.map(t => h('option', { key: t.id, value: t.path }, t.name))
+        )
+      : null,
+    mode === 'confirm'
+      ? h(
+          'div',
+          { className: 'flex items-center gap-1' },
+          h('span', { className: 'flex-1 text-[0.6875rem] text-(--ui-text-secondary)' }, `Delete ${count} session${count === 1 ? '' : 's'} and transcripts?`),
+          h('button', { type: 'button', onClick: () => setMode(null), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel'),
+          h('button', { type: 'button', onClick: () => { ops.bulkDelete(); setMode(null) }, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-danger,#ef4444) hover:bg-(--chrome-action-hover)' }, 'Delete')
+        )
+      : null
   )
 }
 
@@ -722,9 +1022,22 @@ function FinderPane() {
   const [dragOverId, setDragOverId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [menu, setMenu] = useState(null)
+  const [sortAt, setSortAt] = useState(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState(() => new Set())
+
   const [order, setOrder] = usePersisted(ORDER_KEY, [])
   const [showStats, setShowStats] = usePersisted(STATS_KEY, true)
   const [sessionColors, setSessionColors] = usePersisted(SCOLORS_KEY, {})
+  const [pinnedProjects, setPinnedProjects] = usePersisted(PINP_KEY, {})
+  const [pinnedSessions, setPinnedSessions] = usePersisted(PINS_KEY, {})
+  const [sortKey, setSortKey] = usePersisted(SORT_KEY, 'manual')
+  const [privacy, setPrivacy] = usePersisted(PRIVACY_KEY, false)
+  const [groupsRaw, setGroupsRaw] = usePersisted(GROUPS_KEY, [])
+  const [groupOf, setGroupOf] = usePersisted(GROUPOF_KEY, {})
+  const [collapsed, setCollapsed] = usePersisted(COLLAPSED_KEY, {})
+
+  const groupsDef = useMemo(() => ensureGroups(groupsRaw), [groupsRaw])
 
   const { data, isLoading, isError, error, isFetching, refetch } = useProjectTree(profile)
 
@@ -736,12 +1049,11 @@ function FinderPane() {
 
   const needle = query.trim().toLowerCase()
   const grouped = scope !== 'sessions'
-  const canOrder = !needle && grouped
+  const canOrder = !needle && grouped && sortKey === 'manual'
 
   const view = useMemo(() => {
     const projects = data?.projects || []
 
-    // Flat Sessions tab: every session, project shown only as a tag.
     if (scope === 'sessions') {
       const seen = new Set()
       const flat = []
@@ -753,46 +1065,62 @@ function FinderPane() {
         }
       }
       const filtered = flat.filter(s => !needle || sessionText(s).includes(needle))
-      filtered.sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-        return (b.lastActive || 0) - (a.lastActive || 0)
-      })
-      return { flat: filtered.slice(0, FLAT_CAP), flatTotal: filtered.length, projectCount: 0, sessionCount: filtered.length, totalTokens: 0, totalCost: 0 }
+      const sorted = sortSessions(filtered, sortKey, pinnedSessions)
+      return { flat: sorted.slice(0, FLAT_CAP), flatTotal: sorted.length, projectCount: 0, sessionCount: sorted.length, totalTokens: 0, totalCost: 0 }
     }
 
-    const out = []
+    const shown = []
     let sCount = 0
     let tTok = 0
     let tCost = 0
+    let homeBucket = null
     for (const proj of projects) {
-      if (scope === 'projects' && proj.isNoProject) continue // Projects tab = real projects only
+      if (scope === 'projects' && proj.isNoProject) continue
       const nameMatched = projectMatches(proj, needle)
       const matchedSessions = needle ? proj.sessions.filter(s => nameMatched || sessionText(s).includes(needle)) : proj.sessions
       const show = !needle ? true : nameMatched || matchedSessions.length > 0
       if (!show) continue
-      const sessions = matchedSessions.slice().sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-        return (b.lastActive || 0) - (a.lastActive || 0)
-      })
-      out.push({ ...proj, sessions })
+      const sessions = sortSessions(matchedSessions, sortKey, pinnedSessions)
+      const node = { ...proj, sessions }
       sCount += sessions.length
       tTok += proj.totalTokens || 0
       tCost += proj.totalCostUsd || 0
+      if (proj.isNoProject) homeBucket = node
+      else shown.push(node)
     }
-    const rank = g => {
-      if (g.isNoProject) return [2, 0]
-      const idx = order.indexOf(g.id)
-      return idx === -1 ? [1, -(g.lastActive || 0)] : [0, idx]
-    }
-    out.sort((a, b) => {
-      const ra = rank(a)
-      const rb = rank(b)
-      return ra[0] - rb[0] || ra[1] - rb[1]
-    })
-    return { groups: out, projectCount: out.length, sessionCount: sCount, totalTokens: tTok, totalCost: tCost }
-  }, [data, needle, scope, order])
 
-  const groups = view.groups || []
+    const sortedProjects = sortProjects(shown, sortKey, order, pinnedProjects)
+    const byColl = {}
+    for (const g of groupsDef) byColl[g.id] = []
+    for (const p of sortedProjects) {
+      let gid = groupOf[p.id] || DEFAULT_GROUP_ID
+      if (!byColl[gid]) gid = DEFAULT_GROUP_ID
+      byColl[gid].push(p)
+    }
+    const collections = groupsDef
+      .map(g => {
+        const projs = byColl[g.id] || []
+        return {
+          ...g,
+          projects: projs,
+          sessionCount: projs.reduce((n, p) => n + p.sessions.length, 0),
+          totalTokens: projs.reduce((n, p) => n + (p.totalTokens || 0), 0),
+          totalCostUsd: projs.reduce((n, p) => n + (p.totalCostUsd || 0), 0)
+        }
+      })
+      .filter(c => c.projects.length || !needle)
+
+    return { collections, homeBucket, projectCount: sortedProjects.length, sessionCount: sCount, totalTokens: tTok, totalCost: tCost }
+  }, [data, needle, scope, order, sortKey, pinnedProjects, pinnedSessions, groupsDef, groupOf])
+
+  const collections = view.collections || []
+  const allProjectIds = useMemo(() => {
+    const ids = []
+    for (const c of collections) for (const p of c.projects) ids.push(p.id)
+    if (view.homeBucket) ids.push(view.homeBucket.id)
+    return ids
+  }, [collections, view.homeBucket])
+
   const toggle = useCallback(id => {
     setExpanded(prev => {
       const next = new Set(prev)
@@ -801,10 +1129,19 @@ function FinderPane() {
       return next
     })
   }, [])
-  const anyExpanded = groups.some(g => expanded.has(g.id))
+  const anyExpanded = allProjectIds.some(id => expanded.has(id))
   const toggleAll = useCallback(() => {
-    setExpanded(prev => (groups.some(g => prev.has(g.id)) ? new Set() : new Set(groups.map(g => g.id))))
-  }, [groups])
+    setExpanded(prev => (allProjectIds.some(id => prev.has(id)) ? new Set() : new Set(allProjectIds)))
+  }, [allProjectIds])
+
+  const toggleColl = useCallback(id => {
+    setCollapsed(prev => {
+      const next = { ...prev }
+      if (next[id]) delete next[id]
+      else next[id] = true
+      return next
+    })
+  }, [setCollapsed])
 
   const currentOrderIds = useCallback(() => {
     const all = (data?.projects || []).filter(p => !p.isNoProject)
@@ -812,11 +1149,14 @@ function FinderPane() {
       const i = order.indexOf(g.id)
       return i === -1 ? [1, -(g.lastActive || 0)] : [0, i]
     }
-    return all.slice().sort((a, b) => {
-      const ra = rank(a)
-      const rb = rank(b)
-      return ra[0] - rb[0] || ra[1] - rb[1]
-    }).map(g => g.id)
+    return all
+      .slice()
+      .sort((a, b) => {
+        const ra = rank(a)
+        const rb = rank(b)
+        return ra[0] - rb[0] || ra[1] - rb[1]
+      })
+      .map(g => g.id)
   }, [data, order])
 
   const moveTop = useCallback(id => { setMenu(null); setOrder([id, ...currentOrderIds().filter(x => x !== id)]) }, [currentOrderIds, setOrder])
@@ -903,29 +1243,145 @@ function FinderPane() {
   }, [rpc])
   const newSession = useCallback(() => host.newChat(), [])
 
+  // pins
+  const togglePinProject = useCallback(id => {
+    setMenu(null)
+    setPinnedProjects(prev => {
+      const n = { ...prev }
+      if (n[id]) delete n[id]
+      else n[id] = true
+      return n
+    })
+  }, [setPinnedProjects])
+  const togglePinSession = useCallback(id => {
+    setMenu(null)
+    setPinnedSessions(prev => {
+      const n = { ...prev }
+      if (n[id]) delete n[id]
+      else n[id] = true
+      return n
+    })
+  }, [setPinnedSessions])
+
+  // groups
+  const moveProjectToGroup = useCallback((projectId, groupId) => {
+    setMenu(null)
+    setGroupOf(prev => ({ ...prev, [projectId]: groupId }))
+  }, [setGroupOf])
+  const createGroup = useCallback((name, assignProjectId) => {
+    const n = (name || '').trim()
+    setMenu(null)
+    if (!n) return
+    const id = newGroupId()
+    setGroupsRaw(prev => [...ensureGroups(prev), { id, name: n }])
+    if (assignProjectId) setGroupOf(prev => ({ ...prev, [assignProjectId]: id }))
+  }, [setGroupsRaw, setGroupOf])
+  const renameGroup = useCallback((id, name) => {
+    const n = (name || '').trim()
+    if (!n) return
+    setGroupsRaw(prev => ensureGroups(prev).map(g => (g.id === id ? { ...g, name: n } : g)))
+  }, [setGroupsRaw])
+  const setCollectionColor = useCallback((id, color) => {
+    setMenu(null)
+    setGroupsRaw(prev => ensureGroups(prev).map(g => (g.id === id ? { ...g, color: color || undefined } : g)))
+  }, [setGroupsRaw])
+  const deleteGroup = useCallback(id => {
+    setMenu(null)
+    if (id === DEFAULT_GROUP_ID) return
+    setGroupsRaw(prev => ensureGroups(prev).filter(g => g.id !== id))
+    setGroupOf(prev => {
+      const n = { ...prev }
+      for (const k of Object.keys(n)) if (n[k] === id) delete n[k]
+      return n
+    })
+  }, [setGroupsRaw, setGroupOf])
+
   const commitRename = useCallback(
     name => {
-      const g = menu?.group
+      const m = menu
       setMenu(null)
       const n = (name || '').trim()
-      if (g && n && n !== g.name) rpc('projects.update', { id: g.id, name: n }, 'Project renamed')
+      if (!m || !n) return
+      if (m.kind === 'collection') renameGroup(m.coll.id, n)
+      else if (m.group && n !== m.group.name) rpc('projects.update', { id: m.group.id, name: n }, 'Project renamed')
     },
-    [menu, rpc]
+    [menu, rpc, renameGroup]
+  )
+  const commitNewGroup = useCallback(
+    name => {
+      const m = menu
+      createGroup(name, m && m.kind === 'project' ? m.group.id : null)
+    },
+    [menu, createGroup]
   )
   const commitDelete = useCallback(() => {
     const m = menu
     setMenu(null)
     if (!m) return
     if (m.kind === 'project') rpc('projects.delete', { id: m.group.id }, 'Project deleted')
+    else if (m.kind === 'collection') deleteGroup(m.coll.id)
     else rpc('session.delete', { session_id: m.session.id }, 'Session deleted')
-  }, [menu, rpc])
+  }, [menu, rpc, deleteGroup])
 
   const setMenuMode = useCallback(mode => setMenu(prev => (prev ? { ...prev, mode } : prev)), [])
   const closeMenu = useCallback(() => setMenu(null), [])
   const onProjectMenu = useCallback((x, y, group) => setMenu({ kind: 'project', group, x, y, mode: 'root' }), [])
   const onSessionMenu = useCallback((x, y, session) => setMenu({ kind: 'session', session, x, y, mode: 'root' }), [])
+  const onCollectionMenu = useCallback((x, y, coll) => setMenu({ kind: 'collection', coll, x, y, mode: 'root' }), [])
 
-  const isExpanded = g => (needle || scope === 'sessions' ? true : expanded.has(g.id))
+  // bulk
+  const toggleSelectMode = useCallback(() => {
+    setSelectMode(v => {
+      if (v) setSelected(new Set())
+      return !v
+    })
+  }, [])
+  const onToggleSelect = useCallback(id => {
+    setSelected(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  }, [])
+  const clearSelection = useCallback(() => {
+    setSelected(new Set())
+    setSelectMode(false)
+  }, [])
+  const bulkRun = useCallback(
+    (label, fn) => {
+      const ids = [...selected]
+      if (!ids.length) return
+      Promise.allSettled(ids.map(fn)).then(results => {
+        const ok = results.filter(r => r.status === 'fulfilled').length
+        const failed = results.length - ok
+        host.notify({ kind: failed ? 'warning' : 'success', message: `${label}: ${ok} done${failed ? `, ${failed} failed` : ''}` })
+        setSelected(new Set())
+        invalidate()
+      })
+    },
+    [selected, invalidate]
+  )
+  const bulkArchive = useCallback(() => bulkRun('Archived', id => host.request('session.archive', { session_id: id, archived: true })), [bulkRun])
+  const bulkDelete = useCallback(() => bulkRun('Deleted', id => host.request('session.delete', { session_id: id })), [bulkRun])
+  const bulkMove = useCallback(cwd => bulkRun('Moved', id => host.request('session.workspace.move', { session_key: id, cwd })), [bulkRun])
+  const bulkColor = useCallback(
+    color => {
+      setSessionColors(prev => {
+        const n = { ...prev }
+        selected.forEach(id => {
+          if (color) n[id] = color
+          else delete n[id]
+        })
+        return n
+      })
+      setSelected(new Set())
+    },
+    [selected, setSessionColors]
+  )
+
+  const isExpanded = useCallback(id => (needle || scope === 'sessions' ? true : expanded.has(id)), [needle, scope, expanded])
+  const isCollExpanded = useCallback(id => (needle ? true : !collapsed[id]), [needle, collapsed])
 
   const onKeyDown = useCallback(
     e => {
@@ -943,28 +1399,55 @@ function FinderPane() {
     focusedId,
     flat: scope === 'sessions',
     sessionColors,
+    privacy,
     dragOverId,
     canOrder,
+    selectMode,
+    selected,
+    pinnedProjects,
+    pinnedSessions,
     onToggle: toggle,
+    onToggleColl: toggleColl,
+    isExpanded,
+    isCollExpanded,
     onProjectMenu,
     onSessionMenu,
+    onCollectionMenu,
+    onToggleSelect,
     onDragStart: id => { dragId.current = id },
     onDragOver: setDragOverId,
     onDrop
   }
   const menuOps = {
     sessionColors,
+    pinnedProjects,
+    pinnedSessions,
+    canOrder,
+    groups: groupsDef,
+    groupOf,
     setMenuMode,
     closeMenu,
     commitRename,
+    commitNewGroup,
     commitDelete,
     setProjectColor,
     setSessionColor,
+    setCollectionColor,
     archiveSession,
     newSessionInProject,
     moveTop,
-    moveBottom
+    moveBottom,
+    togglePinProject,
+    togglePinSession,
+    moveProjectToGroup
   }
+  const sortOps = {
+    close: () => setSortAt(null),
+    setSort: k => { setSortKey(k); setSortAt(null) },
+    resetOrder: () => { setOrder([]); setSortAt(null) }
+  }
+  const bulkOps = { bulkArchive, bulkDelete, bulkMove, bulkColor, clearSelection }
+  const moveTargets = useMemo(() => (data?.projects || []).filter(p => p.path && !p.isNoProject), [data])
 
   let bodyNode
   if (isLoading) {
@@ -992,16 +1475,25 @@ function FinderPane() {
           )
         )
       : h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matches' : 'No sessions yet', description: needle ? 'Try a title, a word from the chat, or a project name.' : 'Sessions appear here as you chat.' }))
-  } else if (!groups.length) {
+  } else if (!collections.length && !view.homeBucket) {
     bodyNode = h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matches' : 'No projects yet', description: needle ? 'Try a project name, a repo path, or a chat title.' : scope === 'projects' ? 'Create a project to group sessions.' : 'Projects and sessions will appear here.' }))
   } else {
-    bodyNode = h(ScrollArea, { className: 'min-h-0 flex-1' }, h('div', { className: 'flex flex-col gap-0.5 p-1.5' }, ...groups.map(g => renderGroup(g, { ...ops, expanded: isExpanded(g) }))))
+    bodyNode = h(
+      ScrollArea,
+      { className: 'min-h-0 flex-1' },
+      h(
+        'div',
+        { className: 'flex flex-col gap-0.5 p-1.5' },
+        ...collections.map(c => renderCollection(c, ops)),
+        view.homeBucket ? renderGroup(view.homeBucket, ops) : null
+      )
+    )
   }
 
   const countLabel =
     scope === 'sessions'
       ? `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'}`
-      : `${view.projectCount}p · ${view.sessionCount}s${showStats && view.totalTokens ? ` · ${compactNumber(view.totalTokens)} tok` : ''}`
+      : `${view.projectCount}p · ${view.sessionCount}s`
 
   const headerBtn = (icon, label, onClick, active, spinning) =>
     h(
@@ -1022,6 +1514,7 @@ function FinderPane() {
     'div',
     { className: 'flex h-full min-h-0 flex-col' },
     h(ContextMenu, { menu, ops: menuOps }),
+    h(SortMenu, { at: sortAt, sortKey, order, ops: sortOps }),
     h(
       'div',
       { className: 'flex flex-col gap-2 border-b border-(--ui-stroke-secondary) px-2.5 pb-2 pt-2.5' },
@@ -1030,6 +1523,7 @@ function FinderPane() {
         { className: 'flex items-center gap-1.5' },
         h(Codicon, { name: 'search-fuzzy', size: '0.875rem', className: 'text-(--ui-text-tertiary)' }),
         h('span', { className: 'text-[0.8125rem] font-semibold text-foreground' }, 'Finder'),
+        h('span', { className: 'text-[0.625rem] text-(--ui-text-quaternary)' }, countLabel),
         h('div', { className: 'flex-1' }),
         h(ActiveContextChip, {}),
         data?.mode === 'flat'
@@ -1037,9 +1531,6 @@ function FinderPane() {
           : null,
         headerBtn('add', 'New session', newSession),
         headerBtn('new-folder', creating ? 'Cancel new project' : 'New project', () => setCreating(c => !c), creating),
-        headerBtn('graph', showStats ? 'Hide token stats' : 'Show token stats', () => setShowStats(v => !v), showStats),
-        order.length ? headerBtn('clear-all', 'Reset custom order', () => setOrder([])) : null,
-        grouped && groups.length ? headerBtn(anyExpanded ? 'collapse-all' : 'expand-all', anyExpanded ? 'Collapse all' : 'Expand all', toggleAll) : null,
         headerBtn('refresh', 'Refresh', () => refetch(), false, isFetching)
       ),
       h(SearchField, {
@@ -1054,10 +1545,14 @@ function FinderPane() {
       }),
       h(
         'div',
-        { className: 'flex items-center gap-2' },
+        { className: 'flex items-center gap-1' },
         h(ScopeTabs, { scope, setScope }),
         h('div', { className: 'flex-1' }),
-        h(Tip, { label: showStats && view.totalCost ? `Total cost ${fmtCost(view.totalCost)}` : 'Shown' }, h('span', { className: 'shrink-0 text-[0.625rem] text-(--ui-text-quaternary)' }, countLabel))
+        headerBtn(privacy ? 'eye-closed' : 'eye', privacy ? 'Privacy mode on (titles blurred)' : 'Privacy mode (blur titles)', () => setPrivacy(v => !v), privacy),
+        headerBtn('sort-precedence', `Sort: ${SORT_LABEL[sortKey] || 'Custom order'}`, e => setSortAt({ x: e.clientX, y: e.clientY }), sortKey !== 'manual'),
+        headerBtn('checklist', selectMode ? 'Exit multi-select' : 'Multi-select sessions', toggleSelectMode, selectMode),
+        headerBtn('graph', showStats ? 'Hide token stats' : 'Show token stats', () => setShowStats(v => !v), showStats),
+        grouped && allProjectIds.length ? headerBtn(anyExpanded ? 'collapse-all' : 'expand-all', anyExpanded ? 'Collapse all' : 'Expand all', toggleAll) : null
       ),
       creating
         ? h(
@@ -1081,6 +1576,7 @@ function FinderPane() {
           )
         : null
     ),
+    selectMode && selected.size ? h(BulkBar, { count: selected.size, targets: moveTargets, ops: bulkOps }) : null,
     bodyNode
   )
 }
@@ -1113,14 +1609,34 @@ export default {
       else host.notify({ kind: 'info', message: 'Open the Finder tab beside Sessions.' })
     }
 
+    const togglePrivacy = () => {
+      try {
+        const cur = storage ? storage.get(PRIVACY_KEY, false) : false
+        storage && storage.set(PRIVACY_KEY, !cur)
+        host.notify({ kind: 'info', message: `Finder privacy mode ${!cur ? 'on' : 'off'}` })
+      } catch {}
+      reveal()
+    }
+
     ctx.register({
       id: 'open',
       area: PALETTE_AREA,
       data: {
         id: 'finder.open',
         label: 'Find projects & sessions',
-        keywords: ['find', 'finder', 'search', 'project', 'projects', 'session', 'sessions', 'filter', 'jump'],
+        keywords: ['find', 'finder', 'search', 'project', 'projects', 'session', 'sessions', 'filter', 'jump', 'group'],
         run: reveal
+      }
+    })
+
+    ctx.register({
+      id: 'privacy',
+      area: PALETTE_AREA,
+      data: {
+        id: 'finder.privacy',
+        label: 'Finder: toggle privacy mode',
+        keywords: ['finder', 'privacy', 'blur', 'hide', 'redact', 'screenshot', 'stream'],
+        run: togglePrivacy
       }
     })
 
@@ -1128,6 +1644,12 @@ export default {
       id: 'open-key',
       area: KEYBINDS_AREA,
       data: { id: 'finder.open', category: 'view', defaults: ['mod+alt+f'], label: 'Find projects & sessions', run: reveal }
+    })
+
+    ctx.register({
+      id: 'privacy-key',
+      area: KEYBINDS_AREA,
+      data: { id: 'finder.privacy', category: 'view', defaults: ['mod+alt+p'], label: 'Finder: toggle privacy mode', run: togglePrivacy }
     })
   }
 }
