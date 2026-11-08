@@ -863,11 +863,23 @@ function ContextMenu({ menu, ops }) {
     )
   } else if (menu.mode === 'movesession') {
     const currentCwd = String(menu.session?.cwd || '').trim()
-    const targets = (ops.projects || []).filter(p => p && !p.isNoProject && p.path && p.path !== currentCwd)
+    const needle = String(menu.moveNeedle || '').trim().toLowerCase()
+    const allTargets = (ops.projects || []).filter(p => p && !p.isNoProject && p.path && p.path !== currentCwd)
+    const targets = needle ? allTargets.filter(p => String(p.name || '').toLowerCase().includes(needle)) : allTargets
     content = h(
       'div',
       { className: 'flex max-h-[300px] flex-col overflow-auto' },
       heading('Move session to project'),
+      h('input', {
+        autoFocus: true,
+        value: menu.moveNeedle || '',
+        placeholder: 'Search projects',
+        onChange: e => ops.setMoveProjectNeedle(e.target.value),
+        onKeyDown: e => {
+          if (e.key === 'Escape') ops.setMenuMode('root')
+        },
+        className: 'mb-1 w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.75rem] text-foreground outline-none focus:border-(--ui-accent)'
+      }),
       targets.length
         ? targets.map(p =>
             h(
@@ -882,7 +894,7 @@ function ContextMenu({ menu, ops }) {
               p.name
             )
           )
-        : h('div', { className: 'px-1.5 py-1 text-[0.75rem] text-(--ui-text-quaternary)' }, 'No other folder-backed projects'),
+        : h('div', { className: 'px-1.5 py-1 text-[0.75rem] text-(--ui-text-quaternary)' }, needle ? 'No matching projects' : 'No other folder-backed projects'),
       sep(),
       item('arrow-left', 'Back', () => ops.setMenuMode('root'))
     )
@@ -1461,6 +1473,10 @@ function FinderPane() {
     folderPath => setMenu(prev => prev ? { ...prev, folderPath: String(folderPath || '') } : prev),
     []
   )
+  const setMoveProjectNeedle = useCallback(
+    needle => setMenu(prev => prev ? { ...prev, moveNeedle: String(needle || '') } : prev),
+    []
+  )
   const pickProjectFolder = useCallback(async () => {
     const desktop = typeof window !== 'undefined' ? window.hermesDesktop : null
     if (!desktop || typeof desktop.selectPaths !== 'function') {
@@ -1651,6 +1667,7 @@ function FinderPane() {
     archiveSession,
     newSessionInProject,
     moveSessionToProject,
+    setMoveProjectNeedle,
     projects: data?.projects || [],
     moveTop,
     moveBottom,
