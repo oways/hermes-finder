@@ -70,6 +70,8 @@ instantly get the project and every conversation inside it.
 - 🗑️ Delete project (your sessions are kept, they only lose the grouping)
 
 **On a group**
+- 🆕 New project here (created in this group)
+- 💬 New session
 - ➕ New group
 - ✏️ Rename group
 - 🫥 Blur group (privacy)
@@ -150,7 +152,7 @@ run **Reload desktop plugins** to see changes live.
 ## 🗓️ Changelog
 
 ### v1.1.0
-- 📁 **Groups.** Organise projects into collapsible groups (default **General projects**); add, rename, recolour and delete groups, and move projects between them.
+- 📁 **Groups.** Organise projects into collapsible groups (default **General projects**); add, rename, recolour and delete groups, and move projects between them. Create a project or a session straight into a group from its right-click menu.
 - 🫥 **Privacy / blur.** Blur titles **per project, per group, or all at once** (hover to reveal). Blur-all from the header eye or Cmd/Ctrl+Alt+P.
 - 📌 **Pin** projects and sessions to the top.
 - ↕️ **Sort toggle.** Last active, name, token use, cost, or your own custom order.

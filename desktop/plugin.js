@@ -790,6 +790,33 @@ function ContextMenu({ menu, ops }) {
         h('button', { type: 'button', onClick: commit, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Create')
       )
     )
+  } else if (menu.mode === 'newproject') {
+    let el = null
+    const commit = () => ops.commitNewProject(el ? el.value : '')
+    content = h(
+      'div',
+      { className: 'flex flex-col gap-2 p-1' },
+      heading('New project in this group'),
+      h('input', {
+        autoFocus: true,
+        placeholder: 'Project name',
+        onKeyDown: e => {
+          if (e.key === 'Enter') commit()
+          else if (e.key === 'Escape') ops.setMenuMode('root')
+        },
+        ref: node => {
+          el = node
+          if (node) node.focus()
+        },
+        className: 'w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
+      }),
+      h(
+        'div',
+        { className: 'flex justify-end gap-1' },
+        h('button', { type: 'button', onClick: () => ops.setMenuMode('root'), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel'),
+        h('button', { type: 'button', onClick: commit, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Create')
+      )
+    )
   } else if (menu.mode === 'movegroup') {
     const curGid = (ops.groupOf && ops.groupOf[menu.group.id]) || DEFAULT_GROUP_ID
     content = h(
@@ -836,6 +863,8 @@ function ContextMenu({ menu, ops }) {
     content = h(
       'div',
       { className: 'flex flex-col' },
+      item('new-folder', 'New project here', () => ops.setMenuMode('newproject')),
+      item('comment-discussion', 'New session', () => { host.newChat(); ops.closeMenu() }),
       item('add', 'New group…', () => ops.setMenuMode('newgroup')),
       item('edit', 'Rename group…', () => ops.setMenuMode('rename')),
       item(ops.blurGroups && ops.blurGroups[c.id] ? 'eye-closed' : 'eye', ops.blurGroups && ops.blurGroups[c.id] ? 'Unblur group' : 'Blur group', () => ops.toggleBlurGroup(c.id)),
@@ -1379,6 +1408,29 @@ function FinderPane() {
     },
     [menu, createGroup]
   )
+  const createProjectInGroup = useCallback(
+    (name, groupId) => {
+      const n = (name || '').trim()
+      setMenu(null)
+      if (!n) return
+      Promise.resolve(host.request('projects.create', { name: n }))
+        .then(res => {
+          const pid = res && res.project && res.project.id
+          if (pid && groupId && groupId !== DEFAULT_GROUP_ID) setGroupOf(prev => ({ ...prev, [pid]: groupId }))
+          host.notify({ kind: 'success', message: 'Project created' })
+          invalidate()
+        })
+        .catch(err => host.notify({ kind: 'error', message: `projects.create failed: ${(err && err.message) || err}` }))
+    },
+    [invalidate, setGroupOf]
+  )
+  const commitNewProject = useCallback(
+    name => {
+      const m = menu
+      createProjectInGroup(name, m && m.kind === 'collection' ? m.coll.id : DEFAULT_GROUP_ID)
+    },
+    [menu, createProjectInGroup]
+  )
   const commitDelete = useCallback(() => {
     const m = menu
     setMenu(null)
@@ -1498,6 +1550,7 @@ function FinderPane() {
     closeMenu,
     commitRename,
     commitNewGroup,
+    commitNewProject,
     commitDelete,
     setProjectColor,
     setSessionColor,
