@@ -864,7 +864,6 @@ function ContextMenu({ menu, ops }) {
       'div',
       { className: 'flex flex-col' },
       item('new-folder', 'New project here', () => ops.setMenuMode('newproject')),
-      item('comment-discussion', 'New session', () => { host.newChat(); ops.closeMenu() }),
       item('add', 'New group…', () => ops.setMenuMode('newgroup')),
       item('edit', 'Rename group…', () => ops.setMenuMode('rename')),
       item(ops.blurGroups && ops.blurGroups[c.id] ? 'eye-closed' : 'eye', ops.blurGroups && ops.blurGroups[c.id] ? 'Unblur group' : 'Blur group', () => ops.toggleBlurGroup(c.id)),
