@@ -918,8 +918,11 @@ function ContextMenu({ menu, ops }) {
     content = h(
       'div',
       { className: 'flex flex-col' },
+      item('add', 'New session', () => { ops.newSession(); ops.closeMenu() }),
       item('new-folder', 'New project', () => ops.setMenuMode('newproject')),
-      item('add', 'New group', () => ops.setMenuMode('newgroup'))
+      item('layers', 'New group', () => ops.setMenuMode('newgroup')),
+      sep(),
+      item(ops.privacyOn ? 'eye-closed' : 'eye', ops.privacyOn ? 'Unblur all' : 'Blur all', () => { ops.toggleBlurAll(); ops.closeMenu() })
     )
   } else if (menu.kind === 'collection') {
     const c = menu.coll
@@ -1696,6 +1699,9 @@ function FinderPane() {
     setCollectionColor,
     archiveSession,
     newSessionInProject,
+    newSession,
+    privacyOn: privacy,
+    toggleBlurAll: () => setPrivacy(v => !v),
     moveSessionToProject,
     setMoveProjectNeedle,
     projects: data?.projects || [],

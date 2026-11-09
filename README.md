@@ -77,8 +77,10 @@ instantly get the project and every conversation inside it.
 - 🗑️ Delete group (its projects move back to General projects)
 
 **On empty space**
+- 💬 New session
 - 🆕 New project
 - ➕ New group
+- 🫥 Blur all / Unblur all
 
 A **New group** icon also sits in the header toolbar next to New project.
 
