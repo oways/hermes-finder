@@ -76,6 +76,12 @@ instantly get the project and every conversation inside it.
 - 🎨 Group colour
 - 🗑️ Delete group (its projects move back to General projects)
 
+**On empty space**
+- 🆕 New project
+- ➕ New group
+
+A **New group** icon also sits in the header toolbar next to New project.
+
 **On a session**
 - 💬 Open, in a new tab, or in a new window
 - 📁 Search projects and move the session to another project

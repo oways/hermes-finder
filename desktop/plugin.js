@@ -914,6 +914,13 @@ function ContextMenu({ menu, ops }) {
         h('button', { type: 'button', onClick: () => ops.commitDelete(), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-danger,#ef4444) hover:bg-(--chrome-action-hover)' }, 'Delete')
       )
     )
+  } else if (menu.kind === 'empty') {
+    content = h(
+      'div',
+      { className: 'flex flex-col' },
+      item('new-folder', 'New project', () => ops.setMenuMode('newproject')),
+      item('add', 'New group', () => ops.setMenuMode('newgroup'))
+    )
   } else if (menu.kind === 'collection') {
     const c = menu.coll
     content = h(
@@ -1559,6 +1566,8 @@ function FinderPane() {
   const onProjectMenu = useCallback((x, y, group) => setMenu({ kind: 'project', group, x, y, mode: 'root' }), [])
   const onSessionMenu = useCallback((x, y, session) => setMenu({ kind: 'session', session, x, y, mode: 'root' }), [])
   const onCollectionMenu = useCallback((x, y, coll) => setMenu({ kind: 'collection', coll, x, y, mode: 'root' }), [])
+  const onEmptyMenu = useCallback((x, y) => setMenu({ kind: 'empty', x, y, mode: 'root' }), [])
+  const promptNewGroup = useCallback((x, y) => setMenu({ kind: 'empty', x, y, mode: 'newgroup' }), [])
 
   // bulk
   const toggleSelectMode = useCallback(() => {
@@ -1769,7 +1778,13 @@ function FinderPane() {
 
   return h(
     'div',
-    { className: 'flex h-full min-h-0 flex-col' },
+    {
+      className: 'flex h-full min-h-0 flex-col',
+      onContextMenu: e => {
+        e.preventDefault()
+        onEmptyMenu(e.clientX, e.clientY)
+      }
+    },
     h(ContextMenu, { menu, ops: menuOps }),
     h(SortMenu, { at: sortAt, sortKey, order, ops: sortOps }),
     h(
@@ -1788,6 +1803,7 @@ function FinderPane() {
           : null,
         headerBtn('add', 'New session', newSession),
         headerBtn('new-folder', creating ? 'Cancel new project' : 'New project', () => setCreating(c => !c), creating),
+        headerBtn('layers', 'New group', e => promptNewGroup(e.clientX, e.clientY)),
         headerBtn('refresh', 'Refresh', () => refetch(), false, isFetching)
       ),
       h(SearchField, {
