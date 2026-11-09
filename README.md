@@ -92,7 +92,7 @@ A **New group** icon also sits in the header toolbar next to New project.
 - 📌 Pin / unpin
 - 🎨 Tag colour
 - 📦 Archive
-- 🗑️ Delete (uses Hermes' revision-fenced session API)
+- 🗑️ Delete (refused by Hermes while the chat is live)
 
 ## ⬇️ Install
 
@@ -165,7 +165,6 @@ run **Reload desktop plugins** to see changes live.
 - 📌 **Pin** projects and sessions to the top.
 - ↕️ **Sort toggle.** Last active, name, token use, cost, or your own custom order.
 - ☑️ **Multi-select** sessions for bulk archive, delete, colour, or move to a project.
-- 🔧 **Compatible session deletion.** Single and bulk deletion use Hermes' revision-fenced Desktop API, including backends that do not expose the legacy `session.delete` RPC.
 - 🐛 Fixed blur having no visual effect (the plugin now ships its own blur style instead of relying on a Tailwind class the app does not compile).
 
 ### v1.0.0
