@@ -1111,7 +1111,8 @@ function ScopeTabs({ scope, setScope }) {
   const tabs = [
     ['all', 'All'],
     ['projects', 'Projects'],
-    ['sessions', 'Sessions']
+    ['sessions', 'Sessions'],
+    ['groups', 'Groups']
   ]
   return h(
     'div',
@@ -1210,7 +1211,7 @@ function FinderPane() {
     let tCost = 0
     let homeBucket = null
     for (const proj of projects) {
-      if (scope === 'projects' && proj.isNoProject) continue
+      if ((scope === 'projects' || scope === 'groups') && proj.isNoProject) continue
       const nameMatched = projectMatches(proj, needle)
       const matchedSessions = needle ? proj.sessions.filter(s => nameMatched || sessionText(s).includes(needle)) : proj.sessions
       const show = !needle ? true : nameMatched || matchedSessions.length > 0
@@ -1243,7 +1244,7 @@ function FinderPane() {
           totalCostUsd: projs.reduce((n, p) => n + (p.totalCostUsd || 0), 0)
         }
       })
-      .filter(c => c.projects.length || !needle)
+      .filter(c => c.projects.length || !needle || (scope === 'groups' && c.name.toLowerCase().includes(needle)))
 
     return { collections, homeBucket, projectCount: sortedProjects.length, sessionCount: sCount, totalTokens: tTok, totalCost: tCost }
   }, [data, needle, scope, order, sortKey, pinnedProjects, pinnedSessions, groupsDef, groupOf])
@@ -1747,6 +1748,18 @@ function FinderPane() {
           )
         )
       : h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matches' : 'No sessions yet', description: needle ? 'Try a title, a word from the chat, or a project name.' : 'Sessions appear here as you chat.' }))
+  } else if (scope === 'groups') {
+    bodyNode = collections.length
+      ? h(
+          ScrollArea,
+          { className: 'min-h-0 flex-1' },
+          h(
+            'div',
+            { className: 'flex flex-col gap-0.5 p-1.5' },
+            ...collections.map(c => renderCollection(c, ops))
+          )
+        )
+      : h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matching groups' : 'No groups yet', description: needle ? 'Try another group name.' : 'Create a group to organise your projects.' }))
   } else if (!collections.length && !view.homeBucket) {
     bodyNode = h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matches' : 'No projects yet', description: needle ? 'Try a project name, a repo path, or a chat title.' : scope === 'projects' ? 'Create a project to group sessions.' : 'Projects and sessions will appear here.' }))
   } else {
@@ -1765,7 +1778,9 @@ function FinderPane() {
   const countLabel =
     scope === 'sessions'
       ? `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'}`
-      : `${view.projectCount}p · ${view.sessionCount}s`
+      : scope === 'groups'
+        ? `${collections.length} group${collections.length === 1 ? '' : 's'}`
+        : `${view.projectCount}p · ${view.sessionCount}s`
 
   const headerBtn = (icon, label, onClick, active, spinning) =>
     h(
