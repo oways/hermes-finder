@@ -1109,10 +1109,10 @@ function BulkBar({ count, targets, ops }) {
 // -- scope tabs ------------------------------------------------------------------
 function ScopeTabs({ scope, setScope }) {
   const tabs = [
+    ['groups', 'Groups'],
     ['all', 'All'],
     ['projects', 'Projects'],
-    ['sessions', 'Sessions'],
-    ['groups', 'Groups']
+    ['sessions', 'Sessions']
   ]
   return h(
     'div',

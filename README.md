@@ -51,10 +51,10 @@ instantly get the project and every conversation inside it.
 
 | Tab | What you get |
 | --- | --- |
+| **Groups** | Only your groups, each expandable to the projects inside it. |
 | **All** | Every project grouped (including the project-less bucket), expandable to its sessions. |
 | **Projects** | Only real projects, each one expandable to the sessions inside it. |
 | **Sessions** | A flat list of every session, with its project shown as a tag. |
-| **Groups** | Only your groups, each expandable to the projects inside it. |
 
 ## 🖱️ Right-click menus
 
