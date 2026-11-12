@@ -493,14 +493,14 @@ function FocusModeWidget({ mode, setMode }) {
   const selected = FOCUS_MODES.find(item => item.id === mode) || FOCUS_MODES[0]
   return h(
     'div',
-    { className: 'relative min-w-0 max-w-[220px] flex-1' },
+    { className: 'relative min-w-0 flex-1' },
     h(
       'button',
       {
         type: 'button',
         title: `${selected.label}: ${selected.hint}`,
         onClick: () => setOpen(value => !value),
-        className: cn('relative flex h-7 min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)', 'finder-focus-banner', `finder-focus-banner-${selected.id}`)
+        className: cn('relative flex h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)', 'finder-focus-banner', `finder-focus-banner-${selected.id}`)
       },
       h('span', { className: 'pointer-events-none absolute inset-0 overflow-hidden opacity-80', 'aria-hidden': 'true' }, h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' })),
       h(
