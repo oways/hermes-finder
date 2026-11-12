@@ -52,6 +52,7 @@ const STATS_KEY = 'showStats'
 const SCOLORS_KEY = 'sessionColors'
 const PINP_KEY = 'pinnedProjects'
 const PINS_KEY = 'pinnedSessions'
+const UNREAD_KEY = 'unreadSessions'
 const SORT_KEY = 'sortKey'
 const PRIVACY_KEY = 'privacy'
 const BLURP_KEY = 'blurProjects'
@@ -59,7 +60,7 @@ const BLURG_KEY = 'blurGroups'
 const GROUPS_KEY = 'groups'
 const GROUPOF_KEY = 'groupOf'
 const COLLAPSED_KEY = 'collapsedGroups'
-const PROJECT_IDEAS_KEY = 'projectIdeas'
+
 
 const DEFAULT_GROUP_ID = 'general'
 const DEFAULT_GROUP_NAME = 'General projects'
@@ -102,6 +103,7 @@ function ensureBlurStyle() {
 
 let storage = null
 let pluginOs = null
+let pluginFiles = null
 
 // The palette command and keybind run OUTSIDE the React tree, so a direct
 // storage write would not update the mounted pane (usePersisted only reads on
@@ -232,6 +234,41 @@ function copyId(id) {
   if (id) copyText(id, 'Session id copied')
 }
 
+function relativeFolderPath(root, folder) {
+  const clean = value => String(value || '').replace(/\\/g, '/').replace(/\/+$/, '') || '/'
+  const base = clean(root)
+  const target = clean(folder)
+  if (target === base) return ''
+  const prefix = base === '/' ? '/' : `${base}/`
+  return target.startsWith(prefix) ? target.slice(prefix.length) : null
+}
+
+async function writeProjectIdeaFile(folderPath, projectName, idea) {
+  const goal = String(idea || '').trim()
+  const folder = String(folderPath || '').trim()
+  if (!goal || !folder || !pluginFiles || typeof pluginFiles.folders !== 'function') return false
+  try {
+    let grant = (await pluginFiles.folders()).find(item => relativeFolderPath(item.path, folder) !== null)
+    if (!grant && typeof pluginFiles.requestFolder === 'function') {
+      const picked = await pluginFiles.requestFolder()
+      if (picked && picked.ok && picked.folder && relativeFolderPath(picked.folder.path, folder) !== null) grant = picked.folder
+    }
+    if (!grant || typeof pluginFiles.writeText !== 'function') {
+      host.notify({ kind: 'warning', message: 'Grant Finder access to the project folder to create idea.md.' })
+      return false
+    }
+    const relative = relativeFolderPath(grant.path, folder)
+    const file = relative ? `${relative}/idea.md` : 'idea.md'
+    const title = String(projectName || 'Project').trim() || 'Project'
+    const result = await pluginFiles.writeText(grant.id, file, `# ${title}\n\n${goal}\n`)
+    if (!result || result.ok === false) throw new Error(result?.message || result?.error || 'folder access denied')
+    return true
+  } catch (err) {
+    host.notify({ kind: 'warning', message: `Could not write idea.md: ${err?.message || err}` })
+    return false
+  }
+}
+
 // -- persisted plugin state (ctx.storage is sync) --------------------------------
 function usePersisted(key, fallback) {
   const [value, setValue] = useState(() => {
@@ -347,24 +384,6 @@ function sessionText(s) {
     .toLowerCase()
 }
 
-function projectContextSeed(projectName, idea) {
-  const name = String(projectName || 'this project').trim()
-  const goal = String(idea || '').trim()
-  if (!goal) return null
-  return {
-    role: 'user',
-    content: `Project context for "${name}":\n${goal}\n\nTreat this as the goal for the session and keep your work aligned with it.`,
-    display_kind: 'hidden'
-  }
-}
-
-function submitProjectContext(sessionId, seed, attempt = 0) {
-  if (!sessionId || !seed || !seed.content) return
-  if (host.composer.submit(sessionId, seed.content)) return
-  if (attempt >= 15) return
-  setTimeout(() => submitProjectContext(sessionId, seed, attempt + 1), 100)
-}
-
 // -- sorting -------------------------------------------------------------------
 function sortProjects(list, sortKey, order, pinned) {
   const manual = p => {
@@ -437,10 +456,13 @@ function ActiveContextChip() {
 
 // -- session row -----------------------------------------------------------------
 function renderSession(s, ops, blur) {
-  const { needle, showStats, focusedId, focusedBusy, flat, sessionColors, selectMode, selected } = ops
+  const { needle, showStats, focusedId, focusedBusy, flat, sessionColors, unreadSessions, selectMode, selected } = ops
   const active = s.id === focusedId
   const running = active && focusedBusy
   const isSel = selectMode && selected && selected.has(s.id)
+  const unread = unreadSessions && Object.prototype.hasOwnProperty.call(unreadSessions, s.id)
+    ? Boolean(unreadSessions[s.id])
+    : Boolean(s.unread)
   const pinnedHere = (ops.pinnedSessions && ops.pinnedSessions[s.id]) || s.pinned
   const customColor = sessionColors && sessionColors[s.id]
   const title = s.title || '(untitled)'
@@ -468,8 +490,8 @@ function renderSession(s, ops, blur) {
     : h('span', {
         className: cn(
           'mt-1.5 size-1.5 shrink-0 rounded-full',
-          !customColor && (active || s.unread) ? 'bg-(--ui-accent)' : '',
-          !customColor && !active && !s.unread ? 'bg-(--ui-text-quaternary) opacity-50' : ''
+          !customColor && (active || unread) ? 'bg-(--ui-accent)' : '',
+          !customColor && !active && !unread ? 'bg-(--ui-text-quaternary) opacity-50' : ''
         ),
         style: dotStyle
       })
@@ -786,11 +808,11 @@ function ContextMenu({ menu, ops }) {
   if (menu.mode === 'rename') {
     let el = null
     const commit = () => ops.commitRename(el ? el.value : '')
-    const current = menu.kind === 'collection' ? menu.coll?.name : menu.group?.name
+    const current = menu.kind === 'collection' ? menu.coll?.name : menu.kind === 'session' ? menu.session?.title : menu.group?.name
     content = h(
       'div',
       { className: 'flex flex-col gap-2 p-1' },
-      heading(menu.kind === 'collection' ? 'Rename group' : 'Rename project'),
+      heading(menu.kind === 'collection' ? 'Rename group' : menu.kind === 'session' ? 'Rename session' : 'Rename project'),
       h('input', {
         autoFocus: true,
         defaultValue: current || '',
@@ -866,7 +888,7 @@ function ContextMenu({ menu, ops }) {
         rows: 3,
         className: 'w-full resize-y rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.75rem] text-foreground outline-none focus:border-(--ui-accent)'
       }),
-      h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'The project goal is sent as the initial prompt for sessions created here.'),
+      h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'The project goal is saved as idea.md in the project folder.'),
       h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'Project folder'),
       h(
         'div',
@@ -1019,6 +1041,9 @@ function ContextMenu({ menu, ops }) {
     const s = menu.session
     const curColor = ops.sessionColors && ops.sessionColors[s.id]
     const pinned = ops.pinnedSessions && ops.pinnedSessions[s.id]
+    const unread = ops.unreadSessions && Object.prototype.hasOwnProperty.call(ops.unreadSessions, s.id)
+      ? Boolean(ops.unreadSessions[s.id])
+      : Boolean(s.unread)
     content = h(
       'div',
       { className: 'flex flex-col' },
@@ -1026,10 +1051,14 @@ function ContextMenu({ menu, ops }) {
       item('split-horizontal', 'Open in new tab', () => { openSession(s.id, 'tab'); ops.closeMenu() }),
       item('multiple-windows', 'Open in new window', () => { openSession(s.id, 'window'); ops.closeMenu() }),
       item('copy', 'Copy session id', () => { copyId(s.id); ops.closeMenu() }),
+      item('edit', 'Rename…', () => ops.setMenuMode('rename')),
       item('folder', 'Move to project…', () => ops.setMenuMode('movesession')),
       item(pinned ? 'pinned' : 'pin', pinned ? 'Unpin' : 'Pin', () => ops.togglePinSession(s.id)),
+      item(unread ? 'mail-read' : 'mail', unread ? 'Mark as read' : 'Mark as unread', () => ops.toggleUnread(s.id, !unread)),
       h('div', { className: 'px-1 pt-1' }, heading('Tag colour'), colorSwatches(curColor, c => ops.setSessionColor(s.id, c), () => ops.setSessionColor(s.id, ''))),
       sep(),
+      item('repo-forked', 'Branch from…', () => ops.branchSession(s.id)),
+      item('cloud-download', 'Export session', () => ops.exportSession(s.id)),
       item('archive', 'Archive…', () => ops.setMenuMode('confirm'))
     )
   }
@@ -1217,6 +1246,7 @@ function FinderPane() {
   const [sessionColors, setSessionColors] = usePersisted(SCOLORS_KEY, {})
   const [pinnedProjects, setPinnedProjects] = usePersisted(PINP_KEY, {})
   const [pinnedSessions, setPinnedSessions] = usePersisted(PINS_KEY, {})
+  const [unreadSessions, setUnreadSessions] = usePersisted(UNREAD_KEY, {})
   const [sortKey, setSortKey] = usePersisted(SORT_KEY, 'manual')
   const [privacy, setPrivacy] = usePersisted(PRIVACY_KEY, false)
   const [blurProjects, setBlurProjects] = usePersisted(BLURP_KEY, {})
@@ -1224,7 +1254,7 @@ function FinderPane() {
   const [groupsRaw, setGroupsRaw] = usePersisted(GROUPS_KEY, [])
   const [groupOf, setGroupOf] = usePersisted(GROUPOF_KEY, {})
   const [collapsed, setCollapsed] = usePersisted(COLLAPSED_KEY, {})
-  const [projectIdeas, setProjectIdeas] = usePersisted(PROJECT_IDEAS_KEY, {})
+
 
   const groupsDef = useMemo(() => ensureGroups(groupsRaw), [groupsRaw])
 
@@ -1423,8 +1453,6 @@ function FinderPane() {
         host.notify({ kind: 'error', message: 'Open a workspace folder first, then create a session here.' })
         return
       }
-      const idea = String(projectIdeas[proj.id] || proj.idea || '').trim()
-      const seed = projectContextSeed(proj.name, idea)
       const params = { cwd, cwd_explicit: true }
       const attach = proj.path
         ? Promise.resolve()
@@ -1433,15 +1461,12 @@ function FinderPane() {
         .then(() => host.request('session.create', params))
         .then(res => {
           const id = res?.stored_session_id || res?.session_id
-          if (id) {
-            openSession(id, 'stack')
-            if (seed) setTimeout(() => submitProjectContext(id, seed), 100)
-          }
+          if (id) openSession(id, 'stack')
           invalidate()
         })
         .catch(err => host.notify({ kind: 'error', message: `Could not create session here: ${err?.message || err}` }))
     },
-    [invalidate, projectIdeas]
+    [invalidate]
   )
 
   const newProject = useCallback(() => {
@@ -1457,7 +1482,6 @@ function FinderPane() {
     if (newProjIdeaRef.current) newProjIdeaRef.current.value = ''
     setCreating(false)
     const params = { name, use: false }
-    if (idea) params.description = idea
     if (cwd) {
       params.folders = [cwd]
       params.primary_path = cwd
@@ -1465,12 +1489,12 @@ function FinderPane() {
     Promise.resolve(host.request('projects.create', params))
       .then(res => {
         const project = res?.project
-        if (idea && project?.id) setProjectIdeas(prev => ({ ...prev, [project.id]: idea }))
+        if (idea) void writeProjectIdeaFile(cwd, name, idea)
         host.notify({ kind: 'success', message: 'Project created' })
         invalidate()
       })
       .catch(err => host.notify({ kind: 'error', message: `projects.create failed: ${err?.message || err}` }))
-  }, [invalidate, setProjectIdeas])
+  }, [invalidate])
   const newSession = useCallback(() => host.newChat(), [])
 
   // pins
@@ -1492,6 +1516,43 @@ function FinderPane() {
       return n
     })
   }, [setPinnedSessions])
+  const toggleUnread = useCallback((id, unread) => {
+    setMenu(null)
+    setUnreadSessions(prev => {
+      const next = { ...prev }
+      next[id] = Boolean(unread)
+      return next
+    })
+  }, [setUnreadSessions])
+
+  const branchSession = useCallback(
+    id => {
+      setMenu(null)
+      Promise.resolve(host.request('session.branch_stored', { parent_session_id: id }))
+        .then(res => {
+          const child = res?.stored_session_id || res?.session_id
+          if (child) openSession(child, 'stack')
+          host.notify({ kind: 'success', message: 'Session branch created' })
+          invalidate()
+        })
+        .catch(err => host.notify({ kind: 'error', message: `Could not branch session: ${err?.message || err}` }))
+    },
+    [invalidate]
+  )
+
+  const exportSession = useCallback(
+    id => {
+      setMenu(null)
+      Promise.resolve(host.request('session.save', { session_id: id }))
+        .then(res => {
+          const file = res?.file
+          if (file && pluginOs && typeof pluginOs.revealPath === 'function') void pluginOs.revealPath(file)
+          host.notify({ kind: 'success', message: file ? `Session exported to ${file}` : 'Session exported' })
+        })
+        .catch(err => host.notify({ kind: 'error', message: `Could not export session: ${err?.message || err}` }))
+    },
+    []
+  )
 
   // blur (privacy) - per project, per group, or all (header toggle)
   const toggleBlurProject = useCallback(id => {
@@ -1558,6 +1619,7 @@ function FinderPane() {
       const n = (name || '').trim()
       if (!m || !n) return
       if (m.kind === 'collection') renameGroup(m.coll.id, n)
+      else if (m.kind === 'session') rpc('session.title', { session_id: m.session.id, title: n }, 'Session renamed')
       else if (m.group && n !== m.group.name) rpc('projects.update', { id: m.group.id, name: n }, 'Project renamed')
     },
     [menu, rpc, renameGroup]
@@ -1606,18 +1668,17 @@ function FinderPane() {
         return
       }
       const params = { name: n, folders: [folder], primary_path: folder, use: false }
-      if (goal) params.description = goal
       Promise.resolve(host.request('projects.create', params))
         .then(res => {
           const pid = res && res.project && res.project.id
-          if (pid && goal) setProjectIdeas(prev => ({ ...prev, [pid]: goal }))
+          if (pid && goal) void writeProjectIdeaFile(folder, n, goal)
           if (pid && groupId && groupId !== DEFAULT_GROUP_ID) setGroupOf(prev => ({ ...prev, [pid]: groupId }))
           host.notify({ kind: 'success', message: 'Project created with the selected folder' })
           invalidate()
         })
         .catch(err => host.notify({ kind: 'error', message: `projects.create failed: ${(err && err.message) || err}` }))
     },
-    [invalidate, setGroupOf, setProjectIdeas]
+    [invalidate, setGroupOf]
   )
   const commitNewProject = useCallback(
     (name, idea) => {
@@ -1728,6 +1789,7 @@ function FinderPane() {
     focusedBusy,
     flat: scope === 'sessions',
     sessionColors,
+    unreadSessions,
     privacy,
     dragOverId,
     canOrder,
@@ -1753,6 +1815,7 @@ function FinderPane() {
   }
   const menuOps = {
     sessionColors,
+    unreadSessions,
     pinnedProjects,
     pinnedSessions,
     blurProjects,
@@ -1783,6 +1846,9 @@ function FinderPane() {
     moveBottom,
     togglePinProject,
     togglePinSession,
+    toggleUnread,
+    branchSession,
+    exportSession,
     toggleBlurProject,
     toggleBlurGroup,
     moveProjectToGroup
@@ -1967,6 +2033,7 @@ export default {
   register(ctx) {
     storage = ctx.storage
     pluginOs = ctx.os
+    pluginFiles = ctx.files
     ensureBlurStyle()
 
     ctx.register({
