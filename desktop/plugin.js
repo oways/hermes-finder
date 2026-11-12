@@ -10,7 +10,7 @@
  * Collections (groups): every project lives in a group; the default is
  *   "General projects". Add, rename, recolour, delete groups; move projects
  *   between them. Pins, a sort toggle, a privacy (blur) mode, and multi-select
- *   bulk actions (archive / delete / colour / move) are all available.
+ *   bulk actions (archive / colour / move) are all available.
  *
  * Data: `projects.tree` RPC (session.list fallback). Live refresh on
  * `projects.changed` / `sessions.changed`. State persists in ctx.storage.
@@ -951,7 +951,7 @@ function ContextMenu({ menu, ops }) {
     let msg
     if (menu.kind === 'project') msg = `Delete project "${menu.group?.name}"? Its sessions are kept (they just lose this grouping).`
     else if (menu.kind === 'collection') msg = `Delete group "${menu.coll?.name}"? Its projects move back to ${DEFAULT_GROUP_NAME}.`
-    else msg = `Delete "${menu.session?.title || 'this session'}" and its transcript? This cannot be undone.`
+    else msg = `Archive "${menu.session?.title || 'this session'}"? Its transcript will be kept.`
     content = h(
       'div',
       { className: 'flex flex-col gap-2 p-1' },
@@ -960,7 +960,7 @@ function ContextMenu({ menu, ops }) {
         'div',
         { className: 'flex justify-end gap-1' },
         h('button', { type: 'button', onClick: () => ops.setMenuMode('root'), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel'),
-        h('button', { type: 'button', onClick: () => ops.commitDelete(), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-danger,#ef4444) hover:bg-(--chrome-action-hover)' }, 'Delete')
+        h('button', { type: 'button', onClick: () => ops.commitDelete(), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Archive')
       )
     )
   } else if (menu.kind === 'empty') {
@@ -1023,8 +1023,7 @@ function ContextMenu({ menu, ops }) {
       item(pinned ? 'pinned' : 'pin', pinned ? 'Unpin' : 'Pin', () => ops.togglePinSession(s.id)),
       h('div', { className: 'px-1 pt-1' }, heading('Tag colour'), colorSwatches(curColor, c => ops.setSessionColor(s.id, c), () => ops.setSessionColor(s.id, ''))),
       sep(),
-      item('archive', 'Archive', () => ops.archiveSession(s.id)),
-      item('trash', 'Delete', () => ops.setMenuMode('confirm'), true)
+      item('archive', 'Archive…', () => ops.setMenuMode('confirm'))
     )
   }
 
@@ -1119,7 +1118,7 @@ function BulkBar({ count, targets, ops }) {
       btn('archive', 'Archive selected', () => ops.bulkArchive()),
       btn('symbol-color', 'Colour selected', () => setMode(m => (m === 'color' ? null : 'color'))),
       targets.length ? btn('folder', 'Move selected to a project', () => setMode(m => (m === 'move' ? null : 'move'))) : null,
-      btn('trash', 'Delete selected', () => setMode('confirm'), true),
+      btn('archive', 'Archive selected', () => setMode('confirm')),
       btn('close', 'Clear selection', () => ops.clearSelection())
     ),
     mode === 'color'
@@ -1147,9 +1146,9 @@ function BulkBar({ count, targets, ops }) {
       ? h(
           'div',
           { className: 'flex items-center gap-1' },
-          h('span', { className: 'flex-1 text-[0.6875rem] text-(--ui-text-secondary)' }, `Delete ${count} session${count === 1 ? '' : 's'} and transcripts?`),
+          h('span', { className: 'flex-1 text-[0.6875rem] text-(--ui-text-secondary)' }, `Archive ${count} session${count === 1 ? '' : 's'}? Transcripts will be kept.`),
           h('button', { type: 'button', onClick: () => setMode(null), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel'),
-          h('button', { type: 'button', onClick: () => { ops.bulkDelete(); setMode(null) }, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-danger,#ef4444) hover:bg-(--chrome-action-hover)' }, 'Delete')
+          h('button', { type: 'button', onClick: () => { ops.bulkDelete(); setMode(null) }, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Archive')
         )
       : null
   )
@@ -1624,8 +1623,8 @@ function FinderPane() {
     if (!m) return
     if (m.kind === 'project') rpc('projects.delete', { id: m.group.id }, 'Project deleted')
     else if (m.kind === 'collection') deleteGroup(m.coll.id)
-    else rpc('session.delete', { session_id: m.session.id }, 'Session deleted')
-  }, [menu, rpc, deleteGroup])
+    else archiveSession(m.session.id)
+  }, [menu, rpc, deleteGroup, archiveSession])
 
   const setMenuMode = useCallback(mode => setMenu(prev => (prev ? { ...prev, mode } : prev)), [])
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -1669,7 +1668,7 @@ function FinderPane() {
     [selected, invalidate]
   )
   const bulkArchive = useCallback(() => bulkRun('Archived', id => host.request('session.archive', { session_id: id, archived: true })), [bulkRun])
-  const bulkDelete = useCallback(() => bulkRun('Deleted', id => host.request('session.delete', { session_id: id })), [bulkRun])
+  const bulkDelete = useCallback(() => bulkRun('Archived', id => host.request('session.archive', { session_id: id, archived: true })), [bulkRun])
   const bulkMove = useCallback(cwd => bulkRun('Moved', id => host.request('session.workspace.move', { session_key: id, cwd })), [bulkRun])
   const moveSessionToProject = useCallback(
     (sessionId, project) => {
