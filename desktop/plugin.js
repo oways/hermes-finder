@@ -488,19 +488,27 @@ const FOCUS_MODES = [
   { id: 'super', label: 'Super mode', short: 'Super', glyph: '♥', hint: 'Hyper red heartbeats' }
 ]
 
-function FocusModeWidget({ mode, setMode }) {
+function FocusModeWidget({ mode, setMode, panel = false }) {
   const [open, setOpen] = useState(false)
   const selected = FOCUS_MODES.find(item => item.id === mode) || FOCUS_MODES[0]
+  const rootClass = panel ? 'absolute inset-0 z-0' : 'relative min-w-0 flex-1'
+  const buttonClass = cn(
+    panel
+      ? 'relative flex h-full w-full min-w-0 items-end justify-center gap-1.5 overflow-hidden rounded-lg px-2 pb-1.5 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:brightness-110'
+      : 'relative flex h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)',
+    'finder-focus-banner',
+    `finder-focus-banner-${selected.id}`
+  )
   return h(
     'div',
-    { className: 'relative min-w-0 flex-1' },
+    { className: rootClass },
     h(
       'button',
       {
         type: 'button',
         title: `${selected.label}: ${selected.hint}`,
         onClick: () => setOpen(value => !value),
-        className: cn('relative flex h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)', 'finder-focus-banner', `finder-focus-banner-${selected.id}`)
+        className: buttonClass
       },
       h('span', { className: 'pointer-events-none absolute inset-0 overflow-hidden opacity-80', 'aria-hidden': 'true' }, h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' })),
       h(
@@ -2140,14 +2148,14 @@ function FinderPane() {
       { className: 'flex flex-col gap-2 border-b border-(--ui-stroke-secondary) px-2.5 pb-2 pt-2.5' },
       h(
         'div',
-        { className: 'flex min-w-0 flex-col gap-1' },
+        { className: 'relative flex min-h-[72px] min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border border-(--ui-stroke-secondary) px-1.5 pb-1.5 pt-1.5' },
+        h(FocusModeWidget, { mode: focusMode, setMode: setFocusMode, panel: true }),
         h(
           'div',
-          { className: 'flex min-w-0 w-full items-center gap-1.5 overflow-visible' },
+          { className: 'relative z-10 flex min-w-0 w-full items-center gap-1.5' },
           h(Codicon, { name: 'search-fuzzy', size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
           h('span', { className: 'shrink-0 text-[0.8125rem] font-semibold text-foreground' }, 'Finder'),
           h('span', { className: 'min-w-0 shrink truncate text-[0.625rem] text-(--ui-text-quaternary)', title: countLabel }, countLabel),
-          h(FocusModeWidget, { mode: focusMode, setMode: setFocusMode }),
           h(ActiveContextChip, {}),
           data?.mode === 'flat'
             ? h(Tip, { label: `Project grouping unavailable (${data.treeError || 'projects.tree missing'}).` }, h(Codicon, { name: 'warning', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-quaternary)' }))
@@ -2155,7 +2163,7 @@ function FinderPane() {
         ),
         h(
           'div',
-          { className: 'flex w-full flex-wrap items-center justify-end gap-0.5' },
+          { className: 'relative z-10 flex w-full flex-wrap items-center justify-end gap-0.5' },
           headerBtn('add', 'New session', newSession),
           headerBtn('new-folder', creating ? 'Cancel new project' : 'New project', () => setCreating(c => !c), creating),
           headerBtn('layers', 'New group', e => promptNewGroup(e.clientX, e.clientY)),
