@@ -832,7 +832,7 @@ function renderGroup(group, ops) {
 }
 
 // -- collection (user group) ------------------------------------------------------
-function renderCollection(coll, ops) {
+function renderCollection(coll, ops, groupsOnly = false) {
   const expanded = ops.isCollExpanded(coll.id)
   const chevron = expanded ? 'chevron-down' : 'chevron-right'
   const dotStyle = coll.color ? { backgroundColor: coll.color } : undefined
@@ -883,7 +883,7 @@ function renderCollection(coll, ops) {
   )
 
   const body =
-    expanded
+    !groupsOnly && expanded
       ? coll.projects.length
         ? (() => {
             // Keep groups compact like project nodes: show the three most
@@ -1510,7 +1510,7 @@ function FinderPane() {
       })
       .filter(c => c.projects.length || !needle || (scope === 'groups' && c.name.toLowerCase().includes(needle)))
 
-    return { collections, homeBucket, projectCount: sortedProjects.length, sessionCount: sCount, totalTokens: tTok, totalCost: tCost }
+    return { collections, projects: sortedProjects, homeBucket, projectCount: sortedProjects.length, sessionCount: sCount, totalTokens: tTok, totalCost: tCost }
   }, [data, needle, scope, order, sortKey, pinnedProjects, pinnedSessions, groupsDef, groupOf])
 
   const collections = view.collections || []
@@ -2131,6 +2131,19 @@ function FinderPane() {
           )
         )
       : h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matches' : 'No sessions yet', description: needle ? 'Try a title, a word from the chat, or a project name.' : 'Sessions appear here as you chat.' }))
+  } else if (scope === 'projects') {
+    const projects = view.projects || []
+    bodyNode = projects.length
+      ? h(
+          ScrollArea,
+          { className: 'min-h-0 flex-1' },
+          h(
+            'div',
+            { className: 'flex flex-col gap-0.5 p-1.5' },
+            ...projects.map(p => renderGroup(p, ops))
+          )
+        )
+      : h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matching projects' : 'No projects yet', description: needle ? 'Try another project name or repository path.' : 'Create a project to group sessions.' }))
   } else if (scope === 'groups') {
     bodyNode = collections.length
       ? h(
@@ -2139,7 +2152,7 @@ function FinderPane() {
           h(
             'div',
             { className: 'flex flex-col gap-0.5 p-1.5' },
-            ...collections.map(c => renderCollection(c, ops))
+            ...collections.map(c => renderCollection(c, ops, true))
           )
         )
       : h('div', { className: 'flex min-h-0 flex-1 items-center justify-center p-6' }, h(EmptyState, { title: needle ? 'No matching groups' : 'No groups yet', description: needle ? 'Try another group name.' : 'Create a group to organise your projects.' }))
