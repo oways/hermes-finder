@@ -491,10 +491,10 @@ const FOCUS_MODES = [
 function FocusModeWidget({ mode, setMode, panel = false }) {
   const [open, setOpen] = useState(false)
   const selected = FOCUS_MODES.find(item => item.id === mode) || FOCUS_MODES[0]
-  const rootClass = panel ? 'absolute inset-0 z-10' : 'relative min-w-0 flex-1'
+  const rootClass = panel ? 'relative z-10 min-w-0 h-12' : 'relative min-w-0 flex-1'
   const buttonClass = cn(
     panel
-      ? 'absolute inset-x-0 bottom-0 top-5 flex w-full min-w-0 items-end justify-center gap-1.5 overflow-hidden rounded-lg px-2 pb-1.5 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:brightness-110'
+      ? 'relative flex h-full w-full min-w-0 items-end justify-center gap-1.5 overflow-hidden rounded-lg px-2 pb-1.5 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:brightness-110'
       : 'relative flex h-7 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)',
     'finder-focus-banner',
     `finder-focus-banner-${selected.id}`
@@ -2148,8 +2148,7 @@ function FinderPane() {
       { className: 'flex flex-col gap-2 border-b border-(--ui-stroke-secondary) px-2.5 pb-2 pt-2.5' },
       h(
         'div',
-        { className: 'relative min-h-[72px] min-w-0 overflow-visible rounded-lg border border-(--ui-stroke-secondary) px-1.5 pb-1.5 pt-1.5' },
-        h(FocusModeWidget, { mode: focusMode, setMode: setFocusMode, panel: true }),
+        { className: 'relative flex min-h-[72px] min-w-0 flex-col gap-1 overflow-visible rounded-lg border border-(--ui-stroke-secondary) px-1.5 pb-1.5 pt-1.5' },
         h(
           'div',
           { className: 'relative z-20 flex min-w-0 w-full items-center gap-1.5' },
@@ -2168,7 +2167,8 @@ function FinderPane() {
             headerBtn('layers', 'New group', e => promptNewGroup(e.clientX, e.clientY)),
             headerBtn('refresh', 'Refresh', () => refetch(), false, isFetching)
           )
-        )
+        ),
+        h(FocusModeWidget, { mode: focusMode, setMode: setFocusMode, panel: true })
       ),
       h(SearchField, {
         value: query,
