@@ -2141,7 +2141,7 @@ function FinderPane() {
         { className: 'flex min-w-0 flex-col gap-1' },
         h(
           'div',
-          { className: 'flex min-w-0 w-full items-center gap-1.5 overflow-hidden' },
+          { className: 'flex min-w-0 w-full items-center gap-1.5 overflow-visible' },
           h(Codicon, { name: 'search-fuzzy', size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
           h('span', { className: 'shrink-0 text-[0.8125rem] font-semibold text-foreground' }, 'Finder'),
           h('span', { className: 'min-w-0 shrink truncate text-[0.625rem] text-(--ui-text-quaternary)', title: countLabel }, countLabel),
