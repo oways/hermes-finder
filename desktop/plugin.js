@@ -56,6 +56,12 @@ const ELLIPSIS_STYLE = {
   whiteSpace: 'nowrap'
 }
 
+const TITLE_ELLIPSIS_STYLE = {
+  ...ELLIPSIS_STYLE,
+  flex: '1 1 0%',
+  width: 0
+}
+
 const ORDER_KEY = 'projectOrder'
 const STATS_KEY = 'showStats'
 const SCOLORS_KEY = 'sessionColors'
@@ -544,7 +550,7 @@ function renderSession(s, ops, blur) {
       { className: 'flex min-w-0 flex-1 flex-col' },
       h(
         'span',
-        { className: 'flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden' },
+        { className: 'flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden', style: { display: 'flex', width: '100%', minWidth: 0, maxWidth: '100%', overflow: 'hidden' } },
         pinnedHere ? h(Codicon, { name: 'pinned', size: '0.75rem', className: 'shrink-0 text-(--ui-text-quaternary)' }) : null,
         h(
           'span',
@@ -554,7 +560,7 @@ function renderSession(s, ops, blur) {
               s.title ? 'text-(--ui-text-secondary)' : 'text-(--ui-text-quaternary) italic',
               blur && BLUR
             ),
-            style: ELLIPSIS_STYLE,
+            style: TITLE_ELLIPSIS_STYLE,
             title
           },
           highlight(title, needle)
@@ -652,7 +658,7 @@ function renderGroup(group, ops) {
         ? h('span', { className: 'size-2.5 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: iconName, size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
       pinnedHere ? h(Codicon, { name: 'pinned', size: '0.75rem', className: 'shrink-0 text-(--ui-text-quaternary)' }) : null,
-      h('span', { className: cn('min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] font-medium text-foreground', blur && BLUR), style: ELLIPSIS_STYLE, title: group.name }, highlight(group.name, needle)),
+      h('span', { className: cn('min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] font-medium text-foreground', blur && BLUR), style: TITLE_ELLIPSIS_STYLE, title: group.name }, highlight(group.name, needle)),
       h(Badge, { className: 'shrink-0' }, String(group.sessionCount))
     ),
     group.isNoProject
@@ -737,7 +743,7 @@ function renderCollection(coll, ops) {
       coll.color
         ? h('span', { className: 'size-2 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: 'layers', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
-      h('span', { className: cn('min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)', collBlur && BLUR), style: ELLIPSIS_STYLE, title: coll.name }, highlight(coll.name, ops.needle)),
+      h('span', { className: cn('min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)', collBlur && BLUR), style: TITLE_ELLIPSIS_STYLE, title: coll.name }, highlight(coll.name, ops.needle)),
       h(
         'span',
         { className: 'flex shrink-0 items-center gap-2 text-[0.625rem] text-(--ui-text-quaternary)' },
