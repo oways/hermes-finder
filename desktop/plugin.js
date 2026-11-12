@@ -1469,6 +1469,8 @@ function FinderPane() {
         host.notify({ kind: 'error', message: 'Open a workspace folder first, then create a session here.' })
         return
       }
+      const idea = String(proj.idea || '').trim()
+      if (idea) void writeProjectIdeaFile(cwd, proj.name, idea)
       const params = { cwd, cwd_explicit: true }
       const attach = proj.path
         ? Promise.resolve()
