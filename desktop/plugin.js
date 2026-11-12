@@ -2057,7 +2057,7 @@ function FinderPane() {
         {
           type: 'button',
           onClick,
-          className: cn('rounded-md p-1 transition-colors hover:bg-(--chrome-action-hover)', active ? 'text-(--ui-accent)' : 'text-(--ui-text-tertiary) hover:text-foreground')
+          className: cn('shrink-0 rounded-md p-1 transition-colors hover:bg-(--chrome-action-hover)', active ? 'text-(--ui-accent)' : 'text-(--ui-text-tertiary) hover:text-foreground')
         },
         h(Codicon, { name: icon, size: '0.8125rem', spinning })
       )
@@ -2079,19 +2079,26 @@ function FinderPane() {
       { className: 'flex flex-col gap-2 border-b border-(--ui-stroke-secondary) px-2.5 pb-2 pt-2.5' },
       h(
         'div',
-        { className: 'flex items-center gap-1.5' },
-        h(Codicon, { name: 'search-fuzzy', size: '0.875rem', className: 'text-(--ui-text-tertiary)' }),
-        h('span', { className: 'text-[0.8125rem] font-semibold text-foreground' }, 'Finder'),
-        h('span', { className: 'text-[0.625rem] text-(--ui-text-quaternary)' }, countLabel),
-        h('div', { className: 'flex-1' }),
-        h(ActiveContextChip, {}),
-        data?.mode === 'flat'
-          ? h(Tip, { label: `Project grouping unavailable (${data.treeError || 'projects.tree missing'}).` }, h(Codicon, { name: 'warning', size: '0.8125rem', className: 'text-(--ui-text-quaternary)' }))
-          : null,
-        headerBtn('add', 'New session', newSession),
-        headerBtn('new-folder', creating ? 'Cancel new project' : 'New project', () => setCreating(c => !c), creating),
-        headerBtn('layers', 'New group', e => promptNewGroup(e.clientX, e.clientY)),
-        headerBtn('refresh', 'Refresh', () => refetch(), false, isFetching)
+        { className: 'flex min-w-0 flex-wrap items-center gap-1.5' },
+        h(
+          'div',
+          { className: 'flex min-w-0 flex-1 basis-[180px] items-center gap-1.5 overflow-hidden' },
+          h(Codicon, { name: 'search-fuzzy', size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
+          h('span', { className: 'shrink-0 text-[0.8125rem] font-semibold text-foreground' }, 'Finder'),
+          h('span', { className: 'min-w-0 flex-1 truncate text-[0.625rem] text-(--ui-text-quaternary)', title: countLabel }, countLabel),
+          h(ActiveContextChip, {}),
+          data?.mode === 'flat'
+            ? h(Tip, { label: `Project grouping unavailable (${data.treeError || 'projects.tree missing'}).` }, h(Codicon, { name: 'warning', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-quaternary)' }))
+            : null
+        ),
+        h(
+          'div',
+          { className: 'flex shrink-0 items-center gap-0.5' },
+          headerBtn('add', 'New session', newSession),
+          headerBtn('new-folder', creating ? 'Cancel new project' : 'New project', () => setCreating(c => !c), creating),
+          headerBtn('layers', 'New group', e => promptNewGroup(e.clientX, e.clientY)),
+          headerBtn('refresh', 'Refresh', () => refetch(), false, isFetching)
+        )
       ),
       h(SearchField, {
         value: query,
@@ -2105,14 +2112,17 @@ function FinderPane() {
       }),
       h(
         'div',
-        { className: 'flex items-center gap-1' },
-        h(ScopeTabs, { scope, setScope }),
-        h('div', { className: 'flex-1' }),
-        headerBtn(privacy ? 'eye-closed' : 'eye', privacy ? 'Blur-all on (all titles blurred)' : 'Blur all titles (privacy)', () => setPrivacy(v => !v), privacy),
-        headerBtn('sort-precedence', `Sort: ${SORT_LABEL[sortKey] || 'Custom order'}`, e => setSortAt({ x: e.clientX, y: e.clientY }), sortKey !== 'manual'),
-        headerBtn('checklist', selectMode ? 'Exit multi-select' : 'Multi-select sessions', toggleSelectMode, selectMode),
-        headerBtn('graph', showStats ? 'Hide token stats' : 'Show token stats', () => setShowStats(v => !v), showStats),
-        grouped && allProjectIds.length ? headerBtn(anyExpanded ? 'collapse-all' : 'expand-all', anyExpanded ? 'Collapse all' : 'Expand all', toggleAll) : null
+        { className: 'flex min-w-0 flex-wrap items-center gap-1' },
+        h('div', { className: 'min-w-0 flex-1 basis-[180px] overflow-x-auto' }, h(ScopeTabs, { scope, setScope })),
+        h(
+          'div',
+          { className: 'flex shrink-0 items-center gap-0.5' },
+          headerBtn(privacy ? 'eye-closed' : 'eye', privacy ? 'Blur-all on (all titles blurred)' : 'Blur all titles (privacy)', () => setPrivacy(v => !v), privacy),
+          headerBtn('sort-precedence', `Sort: ${SORT_LABEL[sortKey] || 'Custom order'}`, e => setSortAt({ x: e.clientX, y: e.clientY }), sortKey !== 'manual'),
+          headerBtn('checklist', selectMode ? 'Exit multi-select' : 'Multi-select sessions', toggleSelectMode, selectMode),
+          headerBtn('graph', showStats ? 'Hide token stats' : 'Show token stats', () => setShowStats(v => !v), showStats),
+          grouped && allProjectIds.length ? headerBtn(anyExpanded ? 'collapse-all' : 'expand-all', anyExpanded ? 'Collapse all' : 'Expand all', toggleAll) : null
+        )
       ),
       creating
         ? h(
