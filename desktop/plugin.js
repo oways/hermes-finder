@@ -513,7 +513,7 @@ function renderSession(s, ops, blur) {
     {
       key: s.id,
       type: 'button',
-      title: s.cwd || title,
+      title: s.title || s.cwd || title,
       onClick: e => {
         if (selectMode) ops.onToggleSelect(s.id)
         else openSession(s.id, intentFromEvent(e))
@@ -524,7 +524,7 @@ function renderSession(s, ops, blur) {
         ops.onSessionMenu(e.clientX, e.clientY, s)
       },
       className: cn(
-        'group/sess relative flex w-full items-start gap-2 rounded-md py-1.5 text-left transition-colors',
+        'group/sess relative flex w-full items-start gap-2 overflow-hidden rounded-md py-1.5 text-left transition-[background-color,box-shadow,transform] duration-200 ease-out hover:translate-x-0.5 hover:shadow-[inset_2px_0_0_var(--ui-accent)]',
         flat ? 'px-2' : 'pl-6 pr-2',
         isSel ? 'bg-(--chrome-action-hover)' : active ? 'bg-(--ui-row-active-background)' : 'hover:bg-(--chrome-action-hover)'
       )
@@ -542,22 +542,23 @@ function renderSession(s, ops, blur) {
           'span',
           {
             className: cn(
-              'min-w-0 flex-1 truncate text-[0.8125rem] leading-tight',
+              'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] leading-tight',
               s.title ? 'text-(--ui-text-secondary)' : 'text-(--ui-text-quaternary) italic',
               blur && BLUR
-            )
+            ),
+            title
           },
           highlight(title, needle)
         )
       ),
       s.preview
-        ? h('span', { className: cn('truncate text-[0.6875rem] leading-tight text-(--ui-text-quaternary)', blur && BLUR) }, highlight(s.preview, needle))
+        ? h('span', { className: cn('min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] leading-tight text-(--ui-text-quaternary)', blur && BLUR), title: s.preview }, highlight(s.preview, needle))
         : null,
       metaBits.length
         ? h(
             'span',
             { className: 'mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.625rem] leading-tight text-(--ui-text-quaternary)' },
-            ...metaBits.map((bit, index) => h('span', { key: `meta-${index}`, className: 'min-w-0 max-w-full truncate', title: bit }, bit))
+            ...metaBits.map((bit, index) => h('span', { key: `meta-${index}`, className: 'min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap', title: bit }, bit))
           )
         : null
     )
@@ -581,7 +582,7 @@ function renderGroup(group, ops) {
     'div',
     {
       className: cn(
-        'flex items-center gap-0.5 rounded-md pr-1 transition-colors',
+        'flex items-center gap-0.5 rounded-md pr-1 transition-[background-color,box-shadow,transform] duration-200 ease-out hover:translate-x-0.5 hover:shadow-[inset_2px_0_0_var(--ui-accent)]',
         dragOverId === group.id && 'ring-1 ring-(--ui-accent)'
       ),
       onContextMenu: group.isNoProject
@@ -631,9 +632,9 @@ function renderGroup(group, ops) {
       {
         type: 'button',
         onClick: () => ops.onToggle(group.id),
-        title: group.path || group.name,
+        title: group.name || group.path,
         className: cn(
-          'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-1.5 text-left transition-colors',
+          'flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden rounded-md px-1 py-1.5 text-left transition-colors',
           'hover:bg-(--chrome-action-hover)'
         )
       },
@@ -642,7 +643,7 @@ function renderGroup(group, ops) {
         ? h('span', { className: 'size-2.5 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: iconName, size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
       pinnedHere ? h(Codicon, { name: 'pinned', size: '0.75rem', className: 'shrink-0 text-(--ui-text-quaternary)' }) : null,
-      h('span', { className: cn('min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-foreground', blur && BLUR) }, highlight(group.name, needle)),
+      h('span', { className: cn('min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] font-medium text-foreground', blur && BLUR), title: group.name }, highlight(group.name, needle)),
       h(Badge, { className: 'shrink-0' }, String(group.sessionCount))
     ),
     group.isNoProject
@@ -709,7 +710,7 @@ function renderCollection(coll, ops) {
   const header = h(
     'div',
     {
-      className: 'flex items-center gap-0.5 rounded-md',
+      className: 'flex items-center gap-0.5 rounded-md transition-[background-color,box-shadow,transform] duration-200 ease-out hover:translate-x-0.5 hover:shadow-[inset_2px_0_0_var(--ui-accent)]',
       onContextMenu: e => {
         e.preventDefault()
         e.stopPropagation()
@@ -721,13 +722,13 @@ function renderCollection(coll, ops) {
       {
         type: 'button',
         onClick: () => ops.onToggleColl(coll.id),
-        className: 'flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-1 text-left transition-colors hover:bg-(--chrome-action-hover)'
+        className: 'flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden rounded-md px-1 py-1 text-left transition-colors hover:bg-(--chrome-action-hover)'
       },
       h(Codicon, { name: chevron, size: '0.8125rem', className: 'shrink-0 text-(--ui-text-quaternary)' }),
       coll.color
         ? h('span', { className: 'size-2 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: 'layers', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
-      h('span', { className: cn('min-w-0 flex-1 truncate text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)', collBlur && BLUR) }, highlight(coll.name, ops.needle)),
+      h('span', { className: cn('min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)', collBlur && BLUR), title: coll.name }, highlight(coll.name, ops.needle)),
       h(
         'span',
         { className: 'flex shrink-0 items-center gap-2 text-[0.625rem] text-(--ui-text-quaternary)' },
