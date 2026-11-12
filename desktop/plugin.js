@@ -45,6 +45,7 @@ const PANE_ID = `${ID}:pane`
 const PREVIEW_LIMIT = 2000
 const SESSION_LIMIT = 5000
 const FLAT_CAP = 600
+const PROJECT_SESSION_PREVIEW = 3
 
 const ORDER_KEY = 'projectOrder'
 const STATS_KEY = 'showStats'
@@ -58,6 +59,7 @@ const BLURG_KEY = 'blurGroups'
 const GROUPS_KEY = 'groups'
 const GROUPOF_KEY = 'groupOf'
 const COLLAPSED_KEY = 'collapsedGroups'
+const PROJECT_IDEAS_KEY = 'projectIdeas'
 
 const DEFAULT_GROUP_ID = 'general'
 const DEFAULT_GROUP_NAME = 'General projects'
@@ -87,7 +89,13 @@ function ensureBlurStyle() {
     if (typeof document === 'undefined' || document.getElementById(BLUR_STYLE_ID)) return
     const el = document.createElement('style')
     el.id = BLUR_STYLE_ID
-    el.textContent = '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}'
+    el.textContent = [
+      '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}',
+      '@keyframes finder-running-arc{to{transform:rotate(360deg)}}',
+      '.finder-running{position:relative;overflow:visible}',
+      '.finder-running::after{content:"";pointer-events:none;position:absolute;inset:-2px;border-radius:7px;padding:1px;background:conic-gradient(from 0deg,transparent 0 70%,var(--ui-accent) 82%,transparent 95%);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:finder-running-arc 2.23s linear infinite}',
+      '@media (prefers-reduced-motion:reduce){.finder-running::after{animation:none}}'
+    ].join('')
     document.head.appendChild(el)
   } catch {}
 }
@@ -290,7 +298,8 @@ function normalizeNode(node) {
       pinned: Boolean(s.pinned),
       unread: Boolean(s.unread),
       lastActive: s.last_active || s.started_at || 0
-    }))
+    })),
+    idea: node.idea || node.description || ''
   }
 }
 
@@ -336,6 +345,17 @@ function sessionText(s) {
     .filter(Boolean)
     .join(' \u0001 ')
     .toLowerCase()
+}
+
+function projectContextSeed(projectName, idea) {
+  const name = String(projectName || 'this project').trim()
+  const goal = String(idea || '').trim()
+  if (!goal) return null
+  return {
+    role: 'user',
+    content: `Project context for "${name}":\n${goal}\n\nTreat this as the goal for the session and keep your work aligned with it.`,
+    display_kind: 'hidden'
+  }
 }
 
 // -- sorting -------------------------------------------------------------------
@@ -410,8 +430,9 @@ function ActiveContextChip() {
 
 // -- session row -----------------------------------------------------------------
 function renderSession(s, ops, blur) {
-  const { needle, showStats, focusedId, flat, sessionColors, selectMode, selected } = ops
+  const { needle, showStats, focusedId, focusedBusy, flat, sessionColors, selectMode, selected } = ops
   const active = s.id === focusedId
+  const running = active && focusedBusy
   const isSel = selectMode && selected && selected.has(s.id)
   const pinnedHere = (ops.pinnedSessions && ops.pinnedSessions[s.id]) || s.pinned
   const customColor = sessionColors && sessionColors[s.id]
@@ -464,6 +485,7 @@ function renderSession(s, ops, blur) {
       className: cn(
         'group/sess flex w-full items-start gap-2 rounded-md py-1.5 text-left transition-colors',
         flat ? 'px-2' : 'pl-6 pr-2',
+        running ? 'finder-running' : '',
         isSel ? 'bg-(--chrome-action-hover)' : active ? 'bg-(--chrome-action-hover)' : 'hover:bg-(--chrome-action-hover)'
       )
     },
@@ -608,7 +630,25 @@ function renderGroup(group, ops) {
 
   const body =
     expanded && group.sessions.length
-      ? h('div', { className: 'flex flex-col pb-1' }, ...group.sessions.map(s => renderSession(s, ops, blur)))
+      ? (() => {
+          // Keep the project overview compact like Hermes' built-in sidebar.
+          // Searching is an explicit request for matching rows, so it bypasses
+          // the preview cap; otherwise only the three most recent rows mount.
+          const showAll = Boolean(needle) || ops.isShowingAllSessions(group.id)
+          const sessions = showAll ? group.sessions : group.sessions.slice(0, PROJECT_SESSION_PREVIEW)
+          const showAllButton = !showAll && group.sessionCount > sessions.length
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  onClick: () => ops.onShowAllSessions(group.id),
+                  className: 'mx-6 mt-0.5 rounded-md px-2 py-1 text-left text-[0.6875rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)'
+                },
+                `Show all ${group.sessionCount} sessions`
+              )
+            : null
+          return h('div', { className: 'flex flex-col pb-1' }, ...sessions.map(s => renderSession(s, ops, blur)), showAllButton)
+        })()
       : expanded && !group.sessions.length
         ? h('div', { className: 'py-1 pl-8 text-[0.6875rem] text-(--ui-text-quaternary)' }, needle ? 'No matching sessions.' : 'No sessions yet.')
         : null
@@ -792,9 +832,10 @@ function ContextMenu({ menu, ops }) {
       )
     )
   } else if (menu.mode === 'newproject') {
-    let el = null
+    let nameEl = null
+    let ideaEl = null
     const folder = String(menu.folderPath || host.state.cwd.get() || '').trim()
-    const commit = () => ops.commitNewProject(el ? el.value : '')
+    const commit = () => ops.commitNewProject(nameEl ? nameEl.value : '', ideaEl ? ideaEl.value : '')
     content = h(
       'div',
       { className: 'flex flex-col gap-2 p-1' },
@@ -807,11 +848,18 @@ function ContextMenu({ menu, ops }) {
           else if (e.key === 'Escape') ops.setMenuMode('root')
         },
         ref: node => {
-          el = node
+          nameEl = node
           if (node) node.focus()
         },
         className: 'w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
       }),
+      h('textarea', {
+        ref: node => { ideaEl = node },
+        placeholder: 'What is the goal of this project? (optional)',
+        rows: 3,
+        className: 'w-full resize-y rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.75rem] text-foreground outline-none focus:border-(--ui-accent)'
+      }),
+      h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'The project goal is added as hidden context to sessions created here.'),
       h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'Project folder'),
       h(
         'div',
@@ -1140,14 +1188,17 @@ function ScopeTabs({ scope, setScope }) {
 function FinderPane() {
   const profile = useValue(host.state.profile)
   const focusedId = useValue(host.state.focusedStoredSessionId)
+  const focusedBusy = useValue(host.state.busy)
   const qc = useQueryClient()
   const inputRef = useRef(null)
   const dragId = useRef(null)
   const newProjRef = useRef(null)
+  const newProjIdeaRef = useRef(null)
 
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState('all')
   const [expanded, setExpanded] = useState(() => new Set())
+  const [revealedSessions, setRevealedSessions] = useState(() => new Set())
   const [dragOverId, setDragOverId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [menu, setMenu] = useState(null)
@@ -1167,6 +1218,7 @@ function FinderPane() {
   const [groupsRaw, setGroupsRaw] = usePersisted(GROUPS_KEY, [])
   const [groupOf, setGroupOf] = usePersisted(GROUPOF_KEY, {})
   const [collapsed, setCollapsed] = usePersisted(COLLAPSED_KEY, {})
+  const [projectIdeas, setProjectIdeas] = usePersisted(PROJECT_IDEAS_KEY, {})
 
   const groupsDef = useMemo(() => ensureGroups(groupsRaw), [groupsRaw])
 
@@ -1266,6 +1318,14 @@ function FinderPane() {
       return next
     })
   }, [])
+  const showAllSessions = useCallback(id => {
+    setRevealedSessions(prev => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
+  const isShowingAllSessions = useCallback(id => revealedSessions.has(id), [revealedSessions])
   const anyExpanded = allProjectIds.some(id => expanded.has(id))
   const toggleAll = useCallback(() => {
     setExpanded(prev => (allProjectIds.some(id => prev.has(id)) ? new Set() : new Set(allProjectIds)))
@@ -1357,11 +1417,15 @@ function FinderPane() {
         host.notify({ kind: 'error', message: 'Open a workspace folder first, then create a session here.' })
         return
       }
+      const idea = String(projectIdeas[proj.id] || proj.idea || '').trim()
+      const seed = projectContextSeed(proj.name, idea)
+      const params = { cwd, cwd_explicit: true }
+      if (seed) params.messages = [seed]
       const attach = proj.path
         ? Promise.resolve()
         : Promise.resolve(host.request('projects.add_folder', { id: proj.id, path: cwd, is_primary: true }))
       attach
-        .then(() => host.request('session.create', { cwd, cwd_explicit: true }))
+        .then(() => host.request('session.create', params))
         .then(res => {
           const id = res?.stored_session_id || res?.session_id
           if (id) openSession(id, 'stack')
@@ -1369,20 +1433,36 @@ function FinderPane() {
         })
         .catch(err => host.notify({ kind: 'error', message: `Could not create session here: ${err?.message || err}` }))
     },
-    [invalidate]
+    [invalidate, projectIdeas]
   )
 
   const newProject = useCallback(() => {
     const el = newProjRef.current
     const name = ((el && el.value) || '').trim()
+    const idea = String((newProjIdeaRef.current && newProjIdeaRef.current.value) || '').trim()
+    const cwd = String(host.state.cwd.get() || '').trim()
     if (!name) {
       setCreating(false)
       return
     }
     if (el) el.value = ''
+    if (newProjIdeaRef.current) newProjIdeaRef.current.value = ''
     setCreating(false)
-    rpc('projects.create', { name, use: false }, 'Project created')
-  }, [rpc])
+    const params = { name, use: false }
+    if (idea) params.description = idea
+    if (cwd) {
+      params.folders = [cwd]
+      params.primary_path = cwd
+    }
+    Promise.resolve(host.request('projects.create', params))
+      .then(res => {
+        const project = res?.project
+        if (idea && project?.id) setProjectIdeas(prev => ({ ...prev, [project.id]: idea }))
+        host.notify({ kind: 'success', message: 'Project created' })
+        invalidate()
+      })
+      .catch(err => host.notify({ kind: 'error', message: `projects.create failed: ${err?.message || err}` }))
+  }, [invalidate, setProjectIdeas])
   const newSession = useCallback(() => host.newChat(), [])
 
   // pins
@@ -1507,30 +1587,34 @@ function FinderPane() {
     }
   }, [setNewProjectFolder])
   const createProjectInGroup = useCallback(
-    (name, groupId, selectedFolder) => {
+    (name, groupId, selectedFolder, idea) => {
       const n = (name || '').trim()
       const folder = String(selectedFolder || host.state.cwd.get() || '').trim()
+      const goal = String(idea || '').trim()
       setMenu(null)
       if (!n) return
       if (!folder) {
         host.notify({ kind: 'error', message: 'Choose a project folder before creating the project.' })
         return
       }
-      Promise.resolve(host.request('projects.create', { name: n, folders: [folder], primary_path: folder, use: false }))
+      const params = { name: n, folders: [folder], primary_path: folder, use: false }
+      if (goal) params.description = goal
+      Promise.resolve(host.request('projects.create', params))
         .then(res => {
           const pid = res && res.project && res.project.id
+          if (pid && goal) setProjectIdeas(prev => ({ ...prev, [pid]: goal }))
           if (pid && groupId && groupId !== DEFAULT_GROUP_ID) setGroupOf(prev => ({ ...prev, [pid]: groupId }))
           host.notify({ kind: 'success', message: 'Project created with the selected folder' })
           invalidate()
         })
         .catch(err => host.notify({ kind: 'error', message: `projects.create failed: ${(err && err.message) || err}` }))
     },
-    [invalidate, setGroupOf]
+    [invalidate, setGroupOf, setProjectIdeas]
   )
   const commitNewProject = useCallback(
-    name => {
+    (name, idea) => {
       const m = menu
-      createProjectInGroup(name, m && m.kind === 'collection' ? m.coll.id : DEFAULT_GROUP_ID, m && m.folderPath)
+      createProjectInGroup(name, m && m.kind === 'collection' ? m.coll.id : DEFAULT_GROUP_ID, m && m.folderPath, idea)
     },
     [menu, createProjectInGroup]
   )
@@ -1633,6 +1717,7 @@ function FinderPane() {
     needle,
     showStats,
     focusedId,
+    focusedBusy,
     flat: scope === 'sessions',
     sessionColors,
     privacy,
@@ -1647,6 +1732,8 @@ function FinderPane() {
     onToggle: toggle,
     onToggleColl: toggleColl,
     isExpanded,
+    isShowingAllSessions,
+    onShowAllSessions: showAllSessions,
     isCollExpanded,
     onProjectMenu,
     onSessionMenu,
@@ -1842,6 +1929,19 @@ function FinderPane() {
                 } else if (e.key === 'Escape') setCreating(false)
               },
               className: 'min-w-0 flex-1 rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.8125rem] text-foreground outline-none focus:border-(--ui-accent)'
+            }),
+            h('textarea', {
+              ref: newProjIdeaRef,
+              rows: 2,
+              placeholder: 'Project idea or goal (optional)…',
+              className: 'min-w-0 flex-1 resize-y rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.75rem] text-foreground outline-none focus:border-(--ui-accent)',
+              onKeyDown: e => {
+                if (e.key === 'Escape') setCreating(false)
+                else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault()
+                  newProject()
+                }
+              }
             }),
             h('button', { type: 'button', onClick: newProject, className: 'shrink-0 rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Create'),
             h('button', { type: 'button', onClick: () => setCreating(false), className: 'shrink-0 rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel')
