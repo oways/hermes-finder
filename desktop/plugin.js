@@ -108,7 +108,7 @@ function ensureBlurStyle() {
     el.id = BLUR_STYLE_ID
     el.textContent = [
       '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}',
-      '@keyframes finder-focus-breathe{0%,100%{transform:scale(.82);opacity:.45}50%{transform:scale(1.12);opacity:1}}@keyframes finder-focus-wave{0%{transform:translateX(-18%) skewY(-2deg)}50%{transform:translateX(0) skewY(2deg)}100%{transform:translateX(18%) skewY(-2deg)}}.finder-focus-wave{position:absolute;left:-22%;top:25%;width:144%;height:70%;border:1px solid color-mix(in srgb,var(--ui-accent) 58%,transparent);border-radius:50%;animation:finder-focus-wave 8s ease-in-out infinite}.finder-focus-wave:nth-child(2){top:42%;opacity:.52;animation-duration:11s;animation-delay:-3s}.finder-focus-wave:nth-child(3){top:8%;opacity:.3;animation-duration:14s;animation-delay:-6s}@media (prefers-reduced-motion:reduce){.finder-focus-breathe,.finder-focus-wave{animation:none!important}}'
+      '@keyframes finder-focus-breathe{0%,100%{transform:scale(.82);opacity:.45}50%{transform:scale(1.12);opacity:1}}@keyframes finder-focus-wave{0%{transform:translateX(-18%) skewY(-2deg)}50%{transform:translateX(0) skewY(2deg)}100%{transform:translateX(18%) skewY(-2deg)}}@keyframes finder-focus-pulse{0%,100%{transform:scaleX(.72);opacity:.3}50%{transform:scaleX(1);opacity:.9}}@keyframes finder-focus-heartbeat{0%,34%,68%,100%{transform:scale(.72);opacity:.25}39%,48%{transform:scale(1.08);opacity:1}53%,61%{transform:scale(.86);opacity:.6}}.finder-focus-banner{background:color-mix(in srgb,var(--finder-focus-color) 10%,transparent);box-shadow:inset 0 0 18px color-mix(in srgb,var(--finder-focus-color) 12%,transparent)}.finder-focus-banner-study{--finder-focus-color:var(--ui-accent-secondary)}.finder-focus-banner-work{--finder-focus-color:var(--ui-warm)}.finder-focus-banner-super{--finder-focus-color:var(--ui-red)}.finder-focus-wave{position:absolute;left:-22%;top:25%;width:144%;height:70%;border:1px solid color-mix(in srgb,var(--finder-focus-color) 68%,transparent);border-radius:50%;animation:finder-focus-wave 8s ease-in-out infinite}.finder-focus-wave:nth-child(2){top:42%;opacity:.52;animation-duration:11s;animation-delay:-3s}.finder-focus-wave:nth-child(3){top:8%;opacity:.3;animation-duration:14s;animation-delay:-6s}.finder-focus-banner-work .finder-focus-wave{height:28%;top:36%;border-radius:999px;animation-name:finder-focus-pulse;animation-duration:2.4s}.finder-focus-banner-work .finder-focus-wave:nth-child(2){top:51%;animation-delay:-.8s}.finder-focus-banner-work .finder-focus-wave:nth-child(3){top:21%;animation-delay:-1.6s}.finder-focus-banner-super .finder-focus-wave{border-width:2px;animation-name:finder-focus-heartbeat;animation-duration:1.25s}.finder-focus-banner-super .finder-focus-wave:nth-child(2){animation-delay:-.42s}.finder-focus-banner-super .finder-focus-wave:nth-child(3){animation-delay:-.84s}@media (prefers-reduced-motion:reduce){.finder-focus-breathe,.finder-focus-wave{animation:none!important}}'
     ].join('')
     document.head.appendChild(el)
   } catch {}
@@ -483,9 +483,9 @@ function ActiveContextChip() {
 }
 
 const FOCUS_MODES = [
-  { id: 'study', label: 'Study mode', short: 'Study', glyph: '☁', hint: 'Quiet, steady focus' },
-  { id: 'work', label: 'Working mode', short: 'Work', glyph: '◌', hint: 'Keep momentum without noise' },
-  { id: 'super', label: 'Super mode', short: 'Super', glyph: '✦', hint: 'Deep focus and energy' }
+  { id: 'study', label: 'Study mode', short: 'Study', glyph: '☁', hint: 'Calm blue waves' },
+  { id: 'work', label: 'Working mode', short: 'Work', glyph: '◉', hint: 'Focused orange pulses' },
+  { id: 'super', label: 'Super mode', short: 'Super', glyph: '♥', hint: 'Hyper red heartbeats' }
 ]
 
 function FocusModeWidget({ mode, setMode }) {
@@ -500,13 +500,13 @@ function FocusModeWidget({ mode, setMode }) {
         type: 'button',
         title: `${selected.label}: ${selected.hint}`,
         onClick: () => setOpen(value => !value),
-        className: 'relative flex h-7 min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)'
+        className: cn('relative flex h-7 min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)', 'finder-focus-banner', `finder-focus-banner-${selected.id}`)
       },
       h('span', { className: 'pointer-events-none absolute inset-0 overflow-hidden opacity-80', 'aria-hidden': 'true' }, h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' })),
       h(
         'span',
         { className: 'relative z-10 flex size-3.5 shrink-0 items-center justify-center', 'aria-hidden': 'true' },
-        h('span', { className: 'absolute size-2 rounded-full bg-(--ui-accent) opacity-70', style: { animation: 'finder-focus-breathe 3s ease-in-out infinite' } }),
+        h('span', { className: 'absolute size-2 rounded-full opacity-70', style: { backgroundColor: 'var(--finder-focus-color)', animation: 'finder-focus-breathe 3s ease-in-out infinite' } }),
         h('span', { className: 'relative text-[0.625rem] text-foreground' }, selected.glyph)
       ),
       h('span', { className: 'relative z-10 min-w-0 flex-1 truncate' }, selected.label),
