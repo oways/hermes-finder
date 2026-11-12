@@ -9,7 +9,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Hermes-Desktop%20Plugin-6366f1?style=flat-square" alt="Hermes Desktop Plugin" />
   <a href="https://hermes-agent.nousresearch.com/docs/plugins/finder"><img src="https://img.shields.io/badge/Hermes%20Marketplace-listed-22c55e?style=flat-square" alt="Listed in the Hermes Marketplace" /></a>
-  <img src="https://img.shields.io/badge/version-v1.1.0-6366f1?style=flat-square" alt="Version 1.1.0" />
+  <img src="https://img.shields.io/badge/version-v1.2.0-6366f1?style=flat-square" alt="Version 1.2.0" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT license" />
 </p>
 
@@ -24,7 +24,8 @@ the sidebar with one search box that spans your whole workspace.
 ## ✨ Features
 
 - 🗂️ **Search projects by name**, plus session title, preview, folder, git branch, repo, source and model.
-- 🧭 **Four views:** All, Groups, Projects and Sessions.
+- 🧭 **Four views:** All, Groups, Projects and Sessions. Projects and Groups show only the selected entity type.
+- 🌈 **Focus modes:** sky-blue Study waves, green Working pulses, and red Super heartbeats with rotating taglines.
 - 📁 **Groups.** Organise projects into your own groups and move projects between them.
 - 🫥 **Privacy / blur.** Hide sensitive names per project, per group, or all at once.
 - 📌 **Pin** the projects and sessions you use most.
