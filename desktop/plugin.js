@@ -2113,10 +2113,10 @@ function FinderPane() {
       h(
         'div',
         { className: 'flex min-w-0 flex-wrap items-center gap-1' },
-        h('div', { className: 'min-w-0 flex-1 basis-[180px] overflow-x-auto' }, h(ScopeTabs, { scope, setScope })),
+        h('div', { className: 'min-w-0 max-w-full flex-none overflow-x-auto' }, h(ScopeTabs, { scope, setScope })),
         h(
           'div',
-          { className: 'flex shrink-0 items-center gap-0.5' },
+          { className: 'flex shrink-0 flex-wrap items-center gap-0.5' },
           headerBtn(privacy ? 'eye-closed' : 'eye', privacy ? 'Blur-all on (all titles blurred)' : 'Blur all titles (privacy)', () => setPrivacy(v => !v), privacy),
           headerBtn('sort-precedence', `Sort: ${SORT_LABEL[sortKey] || 'Custom order'}`, e => setSortAt({ x: e.clientX, y: e.clientY }), sortKey !== 'manual'),
           headerBtn('checklist', selectMode ? 'Exit multi-select' : 'Multi-select sessions', toggleSelectMode, selectMode),
