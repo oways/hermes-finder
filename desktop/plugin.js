@@ -70,6 +70,7 @@ const PINS_KEY = 'pinnedSessions'
 const UNREAD_KEY = 'unreadSessions'
 const SORT_KEY = 'sortKey'
 const PRIVACY_KEY = 'privacy'
+const FOCUS_MODE_KEY = 'focusMode'
 const BLURP_KEY = 'blurProjects'
 const BLURG_KEY = 'blurGroups'
 const GROUPS_KEY = 'groups'
@@ -106,7 +107,8 @@ function ensureBlurStyle() {
     const el = document.createElement('style')
     el.id = BLUR_STYLE_ID
     el.textContent = [
-      '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}'
+      '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}',
+      '@keyframes finder-focus-breathe{0%,100%{transform:scale(.82);opacity:.45}50%{transform:scale(1.12);opacity:1}}@media (prefers-reduced-motion:reduce){.finder-focus-breathe{animation:none!important}}'
     ].join('')
     document.head.appendChild(el)
   } catch {}
@@ -477,6 +479,62 @@ function ActiveContextChip() {
         h('span', { className: 'block h-full rounded-full', style: { width: `${pct}%`, backgroundColor: tone } })
       )
     )
+  )
+}
+
+const FOCUS_MODES = [
+  { id: 'study', label: 'Study mode', short: 'Study', glyph: '☁', hint: 'Quiet, steady focus' },
+  { id: 'work', label: 'Working mode', short: 'Work', glyph: '◌', hint: 'Keep momentum without noise' },
+  { id: 'super', label: 'Super mode', short: 'Super', glyph: '✦', hint: 'Deep focus and energy' }
+]
+
+function FocusModeWidget({ mode, setMode }) {
+  const [open, setOpen] = useState(false)
+  const selected = FOCUS_MODES.find(item => item.id === mode) || FOCUS_MODES[0]
+  return h(
+    'div',
+    { className: 'relative min-w-0 max-w-[170px] flex-1' },
+    h(
+      'button',
+      {
+        type: 'button',
+        title: `${selected.label}: ${selected.hint}`,
+        onClick: () => setOpen(value => !value),
+        className: 'flex min-w-0 max-w-full items-center gap-1 rounded-full border border-(--ui-stroke-secondary) px-1.5 py-0.5 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)'
+      },
+      h(
+        'span',
+        { className: 'relative flex size-3.5 shrink-0 items-center justify-center', 'aria-hidden': 'true' },
+        h('span', { className: 'absolute size-2 rounded-full bg-(--ui-accent) opacity-70', style: { animation: 'finder-focus-breathe 3s ease-in-out infinite' } }),
+        h('span', { className: 'relative text-[0.625rem] text-foreground' }, selected.glyph)
+      ),
+      h('span', { className: 'min-w-0 flex-1 truncate' }, selected.short),
+      h(Codicon, { name: open ? 'chevron-up' : 'chevron-down', size: '0.625rem', className: 'shrink-0 text-(--ui-text-quaternary)' })
+    ),
+    open
+      ? h(
+          'div',
+          { className: 'absolute left-0 top-full z-50 mt-1 flex w-[190px] flex-col gap-0.5 rounded-lg border border-(--ui-stroke-secondary) p-1 shadow-xl', style: { backgroundColor: 'var(--card)' } },
+          ...FOCUS_MODES.map(item =>
+            h(
+              'button',
+              {
+                key: item.id,
+                type: 'button',
+                title: item.hint,
+                onClick: () => {
+                  setMode(item.id)
+                  setOpen(false)
+                },
+                className: cn('flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-(--chrome-action-hover)', item.id === selected.id ? 'text-foreground' : 'text-(--ui-text-secondary)')
+              },
+              h('span', { className: 'flex size-5 shrink-0 items-center justify-center rounded-full bg-(--chrome-action-hover) text-[0.75rem]' }, item.glyph),
+              h('span', { className: 'flex min-w-0 flex-1 flex-col' }, h('span', { className: 'truncate text-[0.6875rem]' }, item.label), h('span', { className: 'truncate text-[0.5625rem] text-(--ui-text-quaternary)' }, item.hint)),
+              item.id === selected.id ? h(Codicon, { name: 'check', size: '0.6875rem', className: 'shrink-0 text-(--ui-accent)' }) : null
+            )
+          )
+        )
+      : null
   )
 }
 
@@ -1307,6 +1365,7 @@ function FinderPane() {
   const [unreadSessions, setUnreadSessions] = usePersisted(UNREAD_KEY, {})
   const [sortKey, setSortKey] = usePersisted(SORT_KEY, 'manual')
   const [privacy, setPrivacy] = usePersisted(PRIVACY_KEY, false)
+  const [focusMode, setFocusMode] = usePersisted(FOCUS_MODE_KEY, 'study')
   const [blurProjects, setBlurProjects] = usePersisted(BLURP_KEY, {})
   const [blurGroups, setBlurGroups] = usePersisted(BLURG_KEY, {})
   const [groupsRaw, setGroupsRaw] = usePersisted(GROUPS_KEY, [])
@@ -2085,7 +2144,8 @@ function FinderPane() {
           { className: 'flex min-w-0 w-full items-center gap-1.5 overflow-hidden' },
           h(Codicon, { name: 'search-fuzzy', size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
           h('span', { className: 'shrink-0 text-[0.8125rem] font-semibold text-foreground' }, 'Finder'),
-          h('span', { className: 'min-w-0 flex-1 truncate text-[0.625rem] text-(--ui-text-quaternary)', title: countLabel }, countLabel),
+          h('span', { className: 'min-w-0 shrink truncate text-[0.625rem] text-(--ui-text-quaternary)', title: countLabel }, countLabel),
+          h(FocusModeWidget, { mode: focusMode, setMode: setFocusMode }),
           h(ActiveContextChip, {}),
           data?.mode === 'flat'
             ? h(Tip, { label: `Project grouping unavailable (${data.treeError || 'projects.tree missing'}).` }, h(Codicon, { name: 'warning', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-quaternary)' }))
