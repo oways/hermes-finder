@@ -2079,10 +2079,10 @@ function FinderPane() {
       { className: 'flex flex-col gap-2 border-b border-(--ui-stroke-secondary) px-2.5 pb-2 pt-2.5' },
       h(
         'div',
-        { className: 'flex min-w-0 flex-wrap items-center gap-1.5' },
+        { className: 'flex min-w-0 flex-col gap-1' },
         h(
           'div',
-          { className: 'flex min-w-0 flex-1 basis-[180px] items-center gap-1.5 overflow-hidden' },
+          { className: 'flex min-w-0 w-full items-center gap-1.5 overflow-hidden' },
           h(Codicon, { name: 'search-fuzzy', size: '0.875rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
           h('span', { className: 'shrink-0 text-[0.8125rem] font-semibold text-foreground' }, 'Finder'),
           h('span', { className: 'min-w-0 flex-1 truncate text-[0.625rem] text-(--ui-text-quaternary)', title: countLabel }, countLabel),
@@ -2093,7 +2093,7 @@ function FinderPane() {
         ),
         h(
           'div',
-          { className: 'flex shrink-0 items-center gap-0.5' },
+          { className: 'flex w-full flex-wrap items-center justify-end gap-0.5' },
           headerBtn('add', 'New session', newSession),
           headerBtn('new-folder', creating ? 'Cancel new project' : 'New project', () => setCreating(c => !c), creating),
           headerBtn('layers', 'New group', e => promptNewGroup(e.clientX, e.clientY)),
