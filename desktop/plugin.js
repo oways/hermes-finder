@@ -108,7 +108,7 @@ function ensureBlurStyle() {
     el.id = BLUR_STYLE_ID
     el.textContent = [
       '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}',
-      '@keyframes finder-focus-breathe{0%,100%{transform:scale(.82);opacity:.45}50%{transform:scale(1.12);opacity:1}}@media (prefers-reduced-motion:reduce){.finder-focus-breathe{animation:none!important}}'
+      '@keyframes finder-focus-breathe{0%,100%{transform:scale(.82);opacity:.45}50%{transform:scale(1.12);opacity:1}}@keyframes finder-focus-wave{0%{transform:translateX(-18%) skewY(-2deg)}50%{transform:translateX(0) skewY(2deg)}100%{transform:translateX(18%) skewY(-2deg)}}.finder-focus-wave{position:absolute;left:-22%;top:25%;width:144%;height:70%;border:1px solid color-mix(in srgb,var(--ui-accent) 58%,transparent);border-radius:50%;animation:finder-focus-wave 8s ease-in-out infinite}.finder-focus-wave:nth-child(2){top:42%;opacity:.52;animation-duration:11s;animation-delay:-3s}.finder-focus-wave:nth-child(3){top:8%;opacity:.3;animation-duration:14s;animation-delay:-6s}@media (prefers-reduced-motion:reduce){.finder-focus-breathe,.finder-focus-wave{animation:none!important}}'
     ].join('')
     document.head.appendChild(el)
   } catch {}
@@ -493,23 +493,25 @@ function FocusModeWidget({ mode, setMode }) {
   const selected = FOCUS_MODES.find(item => item.id === mode) || FOCUS_MODES[0]
   return h(
     'div',
-    { className: 'relative min-w-0 max-w-[170px] flex-1' },
+    { className: 'relative min-w-0 max-w-[220px] flex-1' },
     h(
       'button',
       {
         type: 'button',
         title: `${selected.label}: ${selected.hint}`,
         onClick: () => setOpen(value => !value),
-        className: 'flex min-w-0 max-w-full items-center gap-1 rounded-full border border-(--ui-stroke-secondary) px-1.5 py-0.5 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)'
+        className: 'relative flex h-7 min-w-0 max-w-full items-center gap-1.5 overflow-hidden rounded-md border border-(--ui-stroke-secondary) px-2 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-(--ui-accent) hover:bg-(--chrome-action-hover)'
       },
+      h('span', { className: 'pointer-events-none absolute inset-0 overflow-hidden opacity-80', 'aria-hidden': 'true' }, h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' }), h('span', { className: 'finder-focus-wave' })),
       h(
         'span',
-        { className: 'relative flex size-3.5 shrink-0 items-center justify-center', 'aria-hidden': 'true' },
+        { className: 'relative z-10 flex size-3.5 shrink-0 items-center justify-center', 'aria-hidden': 'true' },
         h('span', { className: 'absolute size-2 rounded-full bg-(--ui-accent) opacity-70', style: { animation: 'finder-focus-breathe 3s ease-in-out infinite' } }),
         h('span', { className: 'relative text-[0.625rem] text-foreground' }, selected.glyph)
       ),
-      h('span', { className: 'min-w-0 flex-1 truncate' }, selected.short),
-      h(Codicon, { name: open ? 'chevron-up' : 'chevron-down', size: '0.625rem', className: 'shrink-0 text-(--ui-text-quaternary)' })
+      h('span', { className: 'relative z-10 min-w-0 flex-1 truncate' }, selected.label),
+      h('span', { className: 'relative z-10 truncate text-[0.5625rem] text-(--ui-text-quaternary)' }, selected.hint),
+      h(Codicon, { name: open ? 'chevron-up' : 'chevron-down', size: '0.625rem', className: 'relative z-10 shrink-0 text-(--ui-text-quaternary)' })
     ),
     open
       ? h(
