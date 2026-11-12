@@ -1389,13 +1389,22 @@ function FinderPane() {
   }, [collections, view.homeBucket])
 
   const toggle = useCallback(id => {
+    const closing = expanded.has(id)
     setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }, [])
+    if (closing) {
+      setRevealedSessions(prev => {
+        if (!prev.has(id)) return prev
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }, [expanded])
   const showAllSessions = useCallback(id => {
     setRevealedSessions(prev => {
       const next = new Set(prev)
@@ -1418,13 +1427,22 @@ function FinderPane() {
   }, [allProjectIds])
 
   const toggleColl = useCallback(id => {
+    const closing = Boolean(collapsed[id])
     setCollapsed(prev => {
       const next = { ...prev }
       if (next[id]) delete next[id]
       else next[id] = true
       return next
     })
-  }, [setCollapsed])
+    if (closing) {
+      setRevealedProjects(prev => {
+        if (!prev.has(id)) return prev
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }, [collapsed, setCollapsed])
 
   const currentOrderIds = useCallback(() => {
     const all = (data?.projects || []).filter(p => !p.isNoProject)
