@@ -91,11 +91,7 @@ function ensureBlurStyle() {
     const el = document.createElement('style')
     el.id = BLUR_STYLE_ID
     el.textContent = [
-      '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}',
-      '@keyframes finder-running-arc{to{transform:rotate(360deg)}}',
-      '.finder-running{position:relative;overflow:visible}',
-      '.finder-running::after{content:"";pointer-events:none;position:absolute;inset:-2px;border-radius:7px;padding:1px;background:conic-gradient(from 0deg,transparent 0 70%,var(--ui-accent) 82%,transparent 95%);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:finder-running-arc 2.23s linear infinite}',
-      '@media (prefers-reduced-motion:reduce){.finder-running::after{animation:none}}'
+      '.finder-blur{filter:blur(6px);transition:filter .15s ease}.finder-blur:hover{filter:none}'
     ].join('')
     document.head.appendChild(el)
   } catch {}
@@ -527,12 +523,12 @@ function renderSession(s, ops, blur) {
         ops.onSessionMenu(e.clientX, e.clientY, s)
       },
       className: cn(
-        'group/sess flex w-full items-start gap-2 rounded-md py-1.5 text-left transition-colors',
+        'group/sess relative flex w-full items-start gap-2 rounded-md py-1.5 text-left transition-colors',
         flat ? 'px-2' : 'pl-6 pr-2',
-        running ? 'finder-running' : '',
-        isSel ? 'bg-(--chrome-action-hover)' : active ? 'bg-(--chrome-action-hover)' : 'hover:bg-(--chrome-action-hover)'
+        isSel ? 'bg-(--chrome-action-hover)' : active ? 'bg-(--ui-row-active-background)' : 'hover:bg-(--chrome-action-hover)'
       )
     },
+    running ? h('span', { 'aria-hidden': 'true', className: 'arc-border arc-row' }) : null,
     lead,
     h(
       'span',
@@ -545,7 +541,7 @@ function renderSession(s, ops, blur) {
           'span',
           {
             className: cn(
-              'truncate text-[0.8125rem] leading-tight',
+              'min-w-0 flex-1 truncate text-[0.8125rem] leading-tight',
               s.title ? 'text-(--ui-text-secondary)' : 'text-(--ui-text-quaternary) italic',
               blur && BLUR
             )
