@@ -491,7 +491,7 @@ const FOCUS_MODES = [
 function FocusModeWidget({ mode, setMode, panel = false }) {
   const [open, setOpen] = useState(false)
   const selected = FOCUS_MODES.find(item => item.id === mode) || FOCUS_MODES[0]
-  const rootClass = panel ? 'absolute inset-0 z-0' : 'relative min-w-0 flex-1'
+  const rootClass = panel ? 'absolute inset-0 z-10' : 'relative min-w-0 flex-1'
   const buttonClass = cn(
     panel
       ? 'absolute inset-x-0 bottom-0 top-5 flex w-full min-w-0 items-end justify-center gap-1.5 overflow-hidden rounded-lg px-2 pb-1.5 text-left text-[0.625rem] text-(--ui-text-secondary) transition-[background-color,border-color,transform] duration-200 hover:brightness-110'
@@ -2148,7 +2148,7 @@ function FinderPane() {
       { className: 'flex flex-col gap-2 border-b border-(--ui-stroke-secondary) px-2.5 pb-2 pt-2.5' },
       h(
         'div',
-        { className: 'relative min-h-[72px] min-w-0 overflow-hidden rounded-lg border border-(--ui-stroke-secondary) px-1.5 pb-1.5 pt-1.5' },
+        { className: 'relative min-h-[72px] min-w-0 overflow-visible rounded-lg border border-(--ui-stroke-secondary) px-1.5 pb-1.5 pt-1.5' },
         h(FocusModeWidget, { mode: focusMode, setMode: setFocusMode, panel: true }),
         h(
           'div',
