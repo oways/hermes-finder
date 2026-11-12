@@ -46,6 +46,7 @@ const PREVIEW_LIMIT = 2000
 const SESSION_LIMIT = 5000
 const FLAT_CAP = 600
 const PROJECT_SESSION_PREVIEW = 3
+const GROUP_PROJECT_PREVIEW = 3
 
 const ORDER_KEY = 'projectOrder'
 const STATS_KEY = 'showStats'
@@ -752,7 +753,25 @@ function renderCollection(coll, ops) {
   const body =
     expanded
       ? coll.projects.length
-        ? h('div', { className: 'flex flex-col gap-0.5 pl-2' }, ...coll.projects.map(p => renderGroup(p, ops)))
+        ? (() => {
+            // Keep groups compact like project nodes: show the three most
+            // relevant projects first, while search and the explicit reveal
+            // action keep every matching project discoverable.
+            const showAll = Boolean(ops.needle) || ops.isShowingAllProjects(coll.id)
+            const projects = showAll ? coll.projects : coll.projects.slice(0, GROUP_PROJECT_PREVIEW)
+            const showAllButton = !showAll && coll.projects.length > projects.length
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    onClick: () => ops.onShowAllProjects(coll.id),
+                    className: 'mx-6 mt-0.5 rounded-md px-2 py-1 text-left text-[0.6875rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)'
+                  },
+                  `Show all ${coll.projects.length} projects`
+                )
+              : null
+            return h('div', { className: 'flex flex-col gap-0.5 pl-2' }, ...projects.map(p => renderGroup(p, ops)), showAllButton)
+          })()
         : h('div', { className: 'py-1 pl-6 text-[0.6875rem] text-(--ui-text-quaternary)' }, 'No projects in this group. Right-click a project to move it here.')
       : null
 
@@ -1256,6 +1275,7 @@ function FinderPane() {
   const [scope, setScope] = useState('all')
   const [expanded, setExpanded] = useState(() => new Set())
   const [revealedSessions, setRevealedSessions] = useState(() => new Set())
+  const [revealedProjects, setRevealedProjects] = useState(() => new Set())
   const [dragOverId, setDragOverId] = useState(null)
   const [creating, setCreating] = useState(false)
   const [menu, setMenu] = useState(null)
@@ -1384,6 +1404,14 @@ function FinderPane() {
     })
   }, [])
   const isShowingAllSessions = useCallback(id => revealedSessions.has(id), [revealedSessions])
+  const showAllProjects = useCallback(id => {
+    setRevealedProjects(prev => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }, [])
+  const isShowingAllProjects = useCallback(id => revealedProjects.has(id), [revealedProjects])
   const anyExpanded = allProjectIds.some(id => expanded.has(id))
   const toggleAll = useCallback(() => {
     setExpanded(prev => (allProjectIds.some(id => prev.has(id)) ? new Set() : new Set(allProjectIds)))
@@ -1866,6 +1894,8 @@ function FinderPane() {
     isExpanded,
     isShowingAllSessions,
     onShowAllSessions: showAllSessions,
+    isShowingAllProjects,
+    onShowAllProjects: showAllProjects,
     isCollExpanded,
     onProjectMenu,
     onSessionMenu,
