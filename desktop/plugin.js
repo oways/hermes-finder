@@ -994,9 +994,11 @@ function ContextMenu({ menu, ops }) {
       sep(),
       item('arrow-left', 'Back', () => ops.setMenuMode('root'))
     )
-  } else if (menu.mode === 'confirm') {
+  } else if (menu.mode === 'confirm' || menu.mode === 'deleteconfirm') {
     let msg
-    if (menu.kind === 'project') msg = `Delete project "${menu.group?.name}"? Its sessions are kept (they just lose this grouping).`
+    const deletingSession = menu.kind === 'session' && menu.mode === 'deleteconfirm'
+    if (deletingSession) msg = `Delete "${menu.session?.title || 'this session'}" permanently? Its transcript cannot be recovered.`
+    else if (menu.kind === 'project') msg = `Delete project "${menu.group?.name}"? Its sessions are kept (they just lose this grouping).`
     else if (menu.kind === 'collection') msg = `Delete group "${menu.coll?.name}"? Its projects move back to ${DEFAULT_GROUP_NAME}.`
     else msg = `Archive "${menu.session?.title || 'this session'}"? Its transcript will be kept.`
     content = h(
@@ -1007,7 +1009,7 @@ function ContextMenu({ menu, ops }) {
         'div',
         { className: 'flex justify-end gap-1' },
         h('button', { type: 'button', onClick: () => ops.setMenuMode('root'), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel'),
-        h('button', { type: 'button', onClick: () => ops.commitDelete(), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Archive')
+        h('button', { type: 'button', onClick: () => ops.commitDelete(), className: cn('rounded-md px-2 py-0.5 text-[0.75rem] hover:bg-(--chrome-action-hover)', deletingSession ? 'text-(--ui-danger,#ef4444)' : 'text-(--ui-accent)') }, deletingSession ? 'Delete' : 'Archive')
       )
     )
   } else if (menu.kind === 'empty') {
@@ -1078,7 +1080,8 @@ function ContextMenu({ menu, ops }) {
       sep(),
       item('repo-forked', 'Branch from…', () => ops.branchSession(s.id)),
       item('cloud-download', 'Export session', () => ops.exportSession(s.id)),
-      item('archive', 'Archive…', () => ops.setMenuMode('confirm'))
+      item('archive', 'Archive…', () => ops.setMenuMode('confirm')),
+      item('trash', 'Delete session…', () => ops.setMenuMode('deleteconfirm'), true)
     )
   }
 
@@ -1464,6 +1467,7 @@ function FinderPane() {
     [setSessionColors]
   )
   const archiveSession = useCallback(id => { setMenu(null); rpc('session.archive', { session_id: id, archived: true }, 'Session archived') }, [rpc])
+  const deleteSession = useCallback(id => { setMenu(null); rpc('session.delete', { session_id: id }, 'Session deleted') }, [rpc])
   const newSessionInProject = useCallback(
     proj => {
       setMenu(null)
@@ -1714,8 +1718,9 @@ function FinderPane() {
     if (!m) return
     if (m.kind === 'project') rpc('projects.delete', { id: m.group.id }, 'Project deleted')
     else if (m.kind === 'collection') deleteGroup(m.coll.id)
+    else if (m.mode === 'deleteconfirm') deleteSession(m.session.id)
     else archiveSession(m.session.id)
-  }, [menu, rpc, deleteGroup, archiveSession])
+  }, [menu, rpc, deleteGroup, archiveSession, deleteSession])
 
   const setMenuMode = useCallback(mode => setMenu(prev => (prev ? { ...prev, mode } : prev)), [])
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -1849,6 +1854,7 @@ function FinderPane() {
     commitRename,
     commitNewGroup,
     commitNewProject,
+    deleteSession,
     setNewProjectFolder,
     pickProjectFolder,
     commitDelete,
