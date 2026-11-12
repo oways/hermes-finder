@@ -1467,7 +1467,43 @@ function FinderPane() {
     [setSessionColors]
   )
   const archiveSession = useCallback(id => { setMenu(null); rpc('session.archive', { session_id: id, archived: true }, 'Session archived') }, [rpc])
-  const deleteSession = useCallback(id => { setMenu(null); rpc('session.delete', { session_id: id }, 'Session deleted') }, [rpc])
+  const deleteSession = useCallback(
+    async id => {
+      setMenu(null)
+      let snapshot = null
+      let deleted = false
+      try {
+        snapshot = await host.request('session.resume', { session_id: id })
+        if (!Number.isSafeInteger(snapshot?.revision) || !Number.isSafeInteger(snapshot?.execution_generation)) {
+          throw new Error('The session deletion guard could not read a valid revision.')
+        }
+        const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        const result = await host.request('session.mutate', {
+          session_id: id,
+          request_id: requestId,
+          expected_revision: snapshot.revision,
+          expected_generation: snapshot.execution_generation,
+          operation: 'delete',
+          payload: {}
+        })
+        deleted = Boolean(result)
+        if (!deleted) throw new Error('The backend returned an empty deletion result.')
+        host.notify({ kind: 'success', message: 'Session deleted' })
+        invalidate()
+      } catch (err) {
+        host.notify({ kind: 'error', message: `session.mutate delete failed: ${err?.message || err}` })
+        invalidate()
+      } finally {
+        if (!deleted && snapshot?.subscription_id) {
+          void host.request('session.detach', {
+            session_id: snapshot.session_id || id,
+            subscription_id: snapshot.subscription_id
+          }).catch(() => undefined)
+        }
+      }
+    },
+    [invalidate]
+  )
   const newSessionInProject = useCallback(
     proj => {
       setMenu(null)
