@@ -553,7 +553,11 @@ function renderSession(s, ops, blur) {
         ? h('span', { className: cn('truncate text-[0.6875rem] leading-tight text-(--ui-text-quaternary)', blur && BLUR) }, highlight(s.preview, needle))
         : null,
       metaBits.length
-        ? h('span', { className: 'mt-0.5 truncate text-[0.625rem] leading-tight text-(--ui-text-quaternary)' }, metaBits.join('  ·  '))
+        ? h(
+            'span',
+            { className: 'mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.625rem] leading-tight text-(--ui-text-quaternary)' },
+            ...metaBits.map((bit, index) => h('span', { key: `meta-${index}`, className: 'min-w-0 max-w-full truncate', title: bit }, bit))
+          )
         : null
     )
   )
@@ -570,9 +574,7 @@ function renderGroup(group, ops) {
   const iconName = group.isNoProject ? 'inbox' : group.isAuto ? 'git-branch' : 'folder'
   const draggable = canOrder && !group.isNoProject
 
-  const statsText = showStats
-    ? [fmtTokens(group.totalTokens), fmtCost(group.totalCostUsd)].filter(Boolean).join('  ·  ')
-    : ''
+  const statsParts = showStats ? [fmtTokens(group.totalTokens), fmtCost(group.totalCostUsd)].filter(Boolean) : []
 
   const header = h(
     'div',
@@ -659,12 +661,12 @@ function renderGroup(group, ops) {
         )
   )
 
-  const statsLine = statsText
+  const statsLine = statsParts.length
     ? h(
         'div',
-        { className: 'flex items-center gap-1 pb-0.5 pl-8 text-[0.625rem] text-(--ui-text-quaternary)' },
+        { className: 'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 pb-0.5 pl-8 text-[0.625rem] text-(--ui-text-quaternary)' },
         h(Codicon, { name: 'graph', size: '0.6875rem' }),
-        statsText
+        ...statsParts.map((part, index) => h('span', { key: `stat-${index}`, className: 'truncate' }, part))
       )
     : null
 
@@ -725,7 +727,12 @@ function renderCollection(coll, ops) {
         ? h('span', { className: 'size-2 shrink-0 rounded-full', style: dotStyle })
         : h(Codicon, { name: 'layers', size: '0.8125rem', className: 'shrink-0 text-(--ui-text-tertiary)' }),
       h('span', { className: cn('min-w-0 flex-1 truncate text-[0.6875rem] font-semibold uppercase tracking-wide text-(--ui-text-tertiary)', collBlur && BLUR) }, highlight(coll.name, ops.needle)),
-      h('span', { className: 'shrink-0 text-[0.625rem] text-(--ui-text-quaternary)' }, `${coll.projects.length}p · ${coll.sessionCount}s`)
+      h(
+        'span',
+        { className: 'flex shrink-0 items-center gap-2 text-[0.625rem] text-(--ui-text-quaternary)' },
+        h('span', {}, `${coll.projects.length}p`),
+        h('span', {}, `${coll.sessionCount}s`)
+      )
     ),
     h(
       'button',
@@ -1933,7 +1940,7 @@ function FinderPane() {
       ? `${view.sessionCount} session${view.sessionCount === 1 ? '' : 's'}`
       : scope === 'groups'
         ? `${collections.length} group${collections.length === 1 ? '' : 's'}`
-        : `${view.projectCount}p · ${view.sessionCount}s`
+        : `${view.projectCount} projects, ${view.sessionCount} sessions`
 
   const headerBtn = (icon, label, onClick, active, spinning) =>
     h(
