@@ -358,6 +358,13 @@ function projectContextSeed(projectName, idea) {
   }
 }
 
+function submitProjectContext(sessionId, seed, attempt = 0) {
+  if (!sessionId || !seed || !seed.content) return
+  if (host.composer.submit(sessionId, seed.content)) return
+  if (attempt >= 15) return
+  setTimeout(() => submitProjectContext(sessionId, seed, attempt + 1), 100)
+}
+
 // -- sorting -------------------------------------------------------------------
 function sortProjects(list, sortKey, order, pinned) {
   const manual = p => {
@@ -859,7 +866,7 @@ function ContextMenu({ menu, ops }) {
         rows: 3,
         className: 'w-full resize-y rounded-md border border-(--ui-stroke-secondary) bg-transparent px-2 py-1 text-[0.75rem] text-foreground outline-none focus:border-(--ui-accent)'
       }),
-      h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'The project goal is added as hidden context to sessions created here.'),
+      h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'The project goal is sent as the initial prompt for sessions created here.'),
       h('div', { className: 'text-[0.6875rem] text-(--ui-text-quaternary)' }, 'Project folder'),
       h(
         'div',
@@ -1419,7 +1426,6 @@ function FinderPane() {
       const idea = String(projectIdeas[proj.id] || proj.idea || '').trim()
       const seed = projectContextSeed(proj.name, idea)
       const params = { cwd, cwd_explicit: true }
-      if (seed) params.messages = [seed]
       const attach = proj.path
         ? Promise.resolve()
         : Promise.resolve(host.request('projects.add_folder', { id: proj.id, path: cwd, is_primary: true }))
@@ -1427,7 +1433,10 @@ function FinderPane() {
         .then(() => host.request('session.create', params))
         .then(res => {
           const id = res?.stored_session_id || res?.session_id
-          if (id) openSession(id, 'stack')
+          if (id) {
+            openSession(id, 'stack')
+            if (seed) setTimeout(() => submitProjectContext(id, seed), 100)
+          }
           invalidate()
         })
         .catch(err => host.notify({ kind: 'error', message: `Could not create session here: ${err?.message || err}` }))
