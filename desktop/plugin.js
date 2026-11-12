@@ -483,14 +483,57 @@ function ActiveContextChip() {
 }
 
 const FOCUS_MODES = [
-  { id: 'study', label: 'Study mode', short: 'Study', glyph: '☁', hint: 'One step at a time · Lao Tzu' },
-  { id: 'work', label: 'Working mode', short: 'Work', glyph: '◉', hint: 'Well begun is half done · Aristotle' },
-  { id: 'super', label: 'Super mode', short: 'Super', glyph: '♥', hint: 'Impossible until it is done · Mandela' }
+  {
+    id: 'study',
+    label: 'Study mode',
+    short: 'Study',
+    glyph: '☁',
+    quotes: [
+      ['The secret of getting ahead is getting started.', 'Mark Twain'],
+      ['The beautiful thing about learning is that nobody can take it away from you.', 'B. B. King'],
+      ['Live as if you were to die tomorrow. Learn as if you were to live forever.', 'Mahatma Gandhi'],
+      ['The mind is not a vessel to be filled, but a fire to be kindled.', 'Plutarch'],
+      ['A little progress each day adds up to big results.', 'Unknown']
+    ]
+  },
+  {
+    id: 'work',
+    label: 'Working mode',
+    short: 'Work',
+    glyph: '◉',
+    quotes: [
+      ['Well begun is half done.', 'Aristotle'],
+      ['The way to get started is to quit talking and begin doing.', 'Walt Disney'],
+      ['Great things are done by a series of small things brought together.', 'Vincent van Gogh'],
+      ['Do not wait. The time will never be just right.', 'Napoleon Hill'],
+      ['Action is the foundational key to all success.', 'Pablo Picasso']
+    ]
+  },
+  {
+    id: 'super',
+    label: 'Super mode',
+    short: 'Super',
+    glyph: '♥',
+    quotes: [
+      ['It always seems impossible until it is done.', 'Nelson Mandela'],
+      ['The future depends on what you do today.', 'Mahatma Gandhi'],
+      ['Success is the sum of small efforts, repeated day in and day out.', 'Robert Collier'],
+      ['If you want to go fast, go alone. If you want to go far, go together.', 'African proverb'],
+      ['It is never too late to be what you might have been.', 'George Eliot']
+    ]
+  }
 ]
+
+function modeQuote(mode, index = 0) {
+  const quote = mode.quotes[index % mode.quotes.length]
+  return `${quote[0]} · ${quote[1]}`
+}
 
 function FocusModeWidget({ mode, setMode, panel = false }) {
   const [open, setOpen] = useState(false)
+  const [quoteIndices, setQuoteIndices] = useState({})
   const selected = FOCUS_MODES.find(item => item.id === mode) || FOCUS_MODES[0]
+  const selectedQuote = modeQuote(selected, quoteIndices[selected.id] || 0)
   const rootClass = panel ? 'relative z-10 min-w-0 h-12' : 'relative min-w-0 flex-1'
   const buttonClass = cn(
     panel
@@ -506,7 +549,7 @@ function FocusModeWidget({ mode, setMode, panel = false }) {
       'button',
       {
         type: 'button',
-        title: `${selected.label}: ${selected.hint}`,
+        title: `${selected.label}: ${selectedQuote}`,
         onClick: () => setOpen(value => !value),
         className: buttonClass
       },
@@ -518,31 +561,36 @@ function FocusModeWidget({ mode, setMode, panel = false }) {
         h('span', { className: 'relative text-[0.625rem] text-foreground' }, selected.glyph)
       ),
       h('span', { className: 'relative z-10 min-w-0 flex-1 truncate' }, selected.label),
-      h('span', { className: 'relative z-10 truncate text-[0.5625rem] text-(--ui-text-quaternary)' }, selected.hint),
+      h('span', { className: 'relative z-10 truncate text-[0.5625rem] text-(--ui-text-quaternary)' }, selectedQuote),
       h(Codicon, { name: open ? 'chevron-up' : 'chevron-down', size: '0.625rem', className: 'relative z-10 shrink-0 text-(--ui-text-quaternary)' })
     ),
     open
       ? h(
           'div',
           { className: 'absolute left-0 top-full z-50 mt-1 flex w-[190px] flex-col gap-0.5 rounded-lg border border-(--ui-stroke-secondary) p-1 shadow-xl', style: { backgroundColor: 'var(--ui-bg-editor)', opacity: 1, backdropFilter: 'none' } },
-          ...FOCUS_MODES.map(item =>
-            h(
+          ...FOCUS_MODES.map(item => {
+            const quote = modeQuote(item, quoteIndices[item.id] || 0)
+            return h(
               'button',
               {
                 key: item.id,
                 type: 'button',
-                title: item.hint,
+                title: quote,
                 onClick: () => {
+                  setQuoteIndices(previous => ({
+                    ...previous,
+                    [item.id]: ((previous[item.id] || 0) + 1) % item.quotes.length
+                  }))
                   setMode(item.id)
                   setOpen(false)
                 },
                 className: cn('flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-(--chrome-action-hover)', item.id === selected.id ? 'text-foreground' : 'text-(--ui-text-secondary)')
               },
               h('span', { className: 'flex size-5 shrink-0 items-center justify-center rounded-full bg-(--chrome-action-hover) text-[0.75rem]' }, item.glyph),
-              h('span', { className: 'flex min-w-0 flex-1 flex-col' }, h('span', { className: 'truncate text-[0.6875rem]' }, item.label), h('span', { className: 'truncate text-[0.5625rem] text-(--ui-text-quaternary)' }, item.hint)),
+              h('span', { className: 'flex min-w-0 flex-1 flex-col' }, h('span', { className: 'truncate text-[0.6875rem]' }, item.label), h('span', { className: 'truncate text-[0.5625rem] text-(--ui-text-quaternary)' }, quote)),
               item.id === selected.id ? h(Codicon, { name: 'check', size: '0.6875rem', className: 'shrink-0 text-(--ui-accent)' }) : null
             )
-          )
+          })
         )
       : null
   )
