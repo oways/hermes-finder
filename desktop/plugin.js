@@ -32,6 +32,8 @@ import {
   ScrollArea,
   SearchField,
   Tip,
+  ackStoredSessionId,
+  markSessionUnreadFinished,
   useQuery,
   useQueryClient,
   useValue,
@@ -345,6 +347,7 @@ function normalizeNode(node) {
       model: s.model || '',
       messageCount: s.message_count || 0,
       tokens: (s.input_tokens || 0) + (s.output_tokens || 0),
+      costUsd: s.actual_cost_usd ?? s.estimated_cost_usd ?? s.cost_usd ?? 0,
       pinned: Boolean(s.pinned),
       unread: Boolean(s.unread),
       lastActive: s.last_active || s.started_at || 0
@@ -434,8 +437,9 @@ function sortSessions(list, sortKey, pinned) {
       case 'name':
         return (a.title || '').localeCompare(b.title || '')
       case 'tokens':
-      case 'cost':
         return (b.tokens || 0) - (a.tokens || 0)
+      case 'cost':
+        return (b.costUsd || 0) - (a.costUsd || 0)
       default:
         return (b.lastActive || 0) - (a.lastActive || 0)
     }
@@ -449,7 +453,7 @@ function ActiveContextChip() {
   const pct =
     usage && typeof usage.context_percent === 'number' ? Math.max(0, Math.min(100, usage.context_percent)) : null
   if (!focusedId || pct == null) return null
-  const tone = pct >= 85 ? '#ef4444' : pct >= 60 ? '#eab308' : 'var(--ui-accent)'
+  const tone = pct >= 85 ? 'var(--ui-danger)' : pct >= 60 ? 'var(--ui-warning,var(--ui-text-secondary))' : 'var(--ui-accent)'
   return h(
     Tip,
     { label: `Open chat context: ${pct.toFixed(0)}% of window used${usage.cost_usd ? ` · ${fmtCost(usage.cost_usd)}` : ''}` },
@@ -1308,10 +1312,9 @@ function BulkBar({ count, targets, ops }) {
       { className: 'flex items-center gap-1' },
       h('span', { className: 'text-[0.75rem] font-medium text-foreground' }, `${count} selected`),
       h('div', { className: 'flex-1' }),
-      btn('archive', 'Archive selected', () => ops.bulkArchive()),
+      btn('archive', 'Archive selected', () => setMode('confirm')),
       btn('symbol-color', 'Colour selected', () => setMode(m => (m === 'color' ? null : 'color'))),
       targets.length ? btn('folder', 'Move selected to a project', () => setMode(m => (m === 'move' ? null : 'move'))) : null,
-      btn('archive', 'Archive selected', () => setMode('confirm')),
       btn('close', 'Clear selection', () => ops.clearSelection())
     ),
     mode === 'color'
@@ -1341,7 +1344,7 @@ function BulkBar({ count, targets, ops }) {
           { className: 'flex items-center gap-1' },
           h('span', { className: 'flex-1 text-[0.6875rem] text-(--ui-text-secondary)' }, `Archive ${count} session${count === 1 ? '' : 's'}? Transcripts will be kept.`),
           h('button', { type: 'button', onClick: () => setMode(null), className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-text-tertiary) hover:text-foreground' }, 'Cancel'),
-          h('button', { type: 'button', onClick: () => { ops.bulkDelete(); setMode(null) }, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Archive')
+          h('button', { type: 'button', onClick: () => { ops.bulkArchive(); setMode(null) }, className: 'rounded-md px-2 py-0.5 text-[0.75rem] text-(--ui-accent) hover:bg-(--chrome-action-hover)' }, 'Archive')
         )
       : null
   )
@@ -1702,14 +1705,14 @@ function FinderPane() {
       setCreating(false)
       return
     }
+    if (!cwd) {
+      host.notify({ kind: 'error', message: 'Open a workspace folder before creating a project.' })
+      return
+    }
     if (el) el.value = ''
     if (newProjIdeaRef.current) newProjIdeaRef.current.value = ''
     setCreating(false)
-    const params = { name, use: false }
-    if (cwd) {
-      params.folders = [cwd]
-      params.primary_path = cwd
-    }
+    const params = { name, folders: [cwd], primary_path: cwd, use: false }
     Promise.resolve(host.request('projects.create', params))
       .then(res => {
         const project = res?.project
@@ -1742,12 +1745,15 @@ function FinderPane() {
   }, [setPinnedSessions])
   const toggleUnread = useCallback((id, unread) => {
     setMenu(null)
+    const owner = profile || 'default'
+    if (unread) markSessionUnreadFinished(id, owner)
+    else ackStoredSessionId(id, owner)
     setUnreadSessions(prev => {
       const next = { ...prev }
       next[id] = Boolean(unread)
       return next
     })
-  }, [setUnreadSessions])
+  }, [profile, setUnreadSessions])
 
   const branchSession = useCallback(
     id => {
@@ -1963,7 +1969,6 @@ function FinderPane() {
     [selected, invalidate]
   )
   const bulkArchive = useCallback(() => bulkRun('Archived', id => host.request('session.archive', { session_id: id, archived: true })), [bulkRun])
-  const bulkDelete = useCallback(() => bulkRun('Archived', id => host.request('session.archive', { session_id: id, archived: true })), [bulkRun])
   const bulkMove = useCallback(cwd => bulkRun('Moved', id => host.request('session.workspace.move', { session_key: id, cwd })), [bulkRun])
   const moveSessionToProject = useCallback(
     (sessionId, project) => {
@@ -2086,7 +2091,7 @@ function FinderPane() {
     setSort: k => { setSortKey(k); setSortAt(null) },
     resetOrder: () => { setOrder([]); setSortAt(null) }
   }
-  const bulkOps = { bulkArchive, bulkDelete, bulkMove, bulkColor, clearSelection }
+  const bulkOps = { bulkArchive, bulkMove, bulkColor, clearSelection }
   const moveTargets = useMemo(() => (data?.projects || []).filter(p => p.path && !p.isNoProject), [data])
 
   let bodyNode
