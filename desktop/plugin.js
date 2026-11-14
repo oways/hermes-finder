@@ -247,21 +247,6 @@ function copyId(id) {
   if (id) copyText(id, 'Session id copied')
 }
 
-function openSessionInTerminal(sessionId, cwd) {
-  // The public plugin SDK currently exposes no terminal-session door. Use the
-  // same host capability as Hermes' built-in session menu when available.
-  const opener = globalThis.hermesDesktop?.openSessionInTerminal
-  if (typeof opener !== 'function') {
-    host.notify({ kind: 'warning', message: 'Opening a session in the terminal is unavailable in this desktop build.' })
-    return
-  }
-  Promise.resolve(opener(sessionId, { cwd: cwd || undefined }))
-    .then(result => {
-      if (result && result.ok === false) host.notify({ kind: 'error', message: result.error || 'Could not open the session in the terminal.' })
-    })
-    .catch(err => host.notify({ kind: 'error', message: `Could not open terminal: ${err?.message || err}` }))
-}
-
 function relativeFolderPath(root, folder) {
   const clean = value => String(value || '').replace(/\\/g, '/').replace(/\/+$/, '') || '/'
   const base = clean(root)
@@ -1221,7 +1206,6 @@ function ContextMenu({ menu, ops }) {
       item('comment-discussion', 'Open', () => { openSession(s.id, 'stack'); ops.closeMenu() }),
       item('split-horizontal', 'Open in new tab', () => { openSession(s.id, 'tab'); ops.closeMenu() }),
       item('multiple-windows', 'Open in new window', () => { openSession(s.id, 'window'); ops.closeMenu() }),
-      item('terminal', 'Open in terminal', () => { openSessionInTerminal(s.id, s.cwd); ops.closeMenu() }),
       item('copy', 'Copy session id', () => { copyId(s.id); ops.closeMenu() }),
       item('edit', 'Rename…', () => ops.setMenuMode('rename')),
       item('folder', 'Move to project…', () => ops.setMenuMode('movesession')),
